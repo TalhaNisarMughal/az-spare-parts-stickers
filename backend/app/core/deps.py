@@ -23,11 +23,14 @@ def get_current_user(
     except jwt.PyJWTError:
         raise credentials_error
 
-    email = payload.get("sub")
-    if not email:
+    sub = payload.get("sub")
+    if not sub:
         raise credentials_error
 
-    user = db.query(User).filter(User.email == email).first()
+    # Tokens carry the user id; older ones carried the email.
+    user = db.get(User, int(sub)) if str(sub).isdigit() else None
+    if not user and "@" in str(sub):
+        user = db.query(User).filter(User.email == sub).first()
     if not user:
         raise credentials_error
     return user
@@ -37,6 +40,6 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
     if user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the admin can access the Dashboard.",
+            detail="Only the admin can access this.",
         )
     return user

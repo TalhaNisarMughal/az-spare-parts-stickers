@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import api from '../api/client'
 
 const AuthContext = createContext(null)
@@ -12,11 +12,15 @@ export function AuthProvider({ children }) {
     }
   })
 
+  const persist = (u) => {
+    localStorage.setItem('ms_user', JSON.stringify(u))
+    setUser(u)
+  }
+
   const login = async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password })
     localStorage.setItem('ms_token', data.access_token)
-    localStorage.setItem('ms_user', JSON.stringify(data.user))
-    setUser(data.user)
+    persist(data.user)
     return data.user
   }
 
@@ -26,8 +30,22 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
+  /** Re-read the profile from the server (name, email, role, picture). */
+  const refreshUser = useCallback(async () => {
+    const { data } = await api.get('/auth/me')
+    persist(data)
+    return data
+  }, [])
+
+  // Sessions from before the profile feature lack an id — refresh them once.
+  useEffect(() => {
+    if (user && user.id == null) refreshUser().catch(() => {})
+  }, []) // eslint-disable-line
+
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, login, logout, refreshUser, setUser: persist }}>
+      {children}
+    </AuthContext.Provider>
   )
 }
 

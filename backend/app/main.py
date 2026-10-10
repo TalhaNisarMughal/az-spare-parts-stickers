@@ -19,32 +19,34 @@ from .routers import (
     receipts,
     stock,
     suppliers,
+    users,
 )
 from .utils.pdf import bills_dir
 
 
 def seed_default_users() -> None:
-    """Make sure the admin and user accounts from .env always exist."""
+    """Bootstrap the first admin and staff accounts from .env.
+
+    Only runs when there are no accounts at all. After that, accounts are
+    managed from the Settings page (names, emails, roles and passwords), so
+    the .env values are never re-applied over what was changed in the app.
+    """
     db = SessionLocal()
     try:
+        if db.query(User.id).first() is not None:
+            return
         for email, password, name, role in [
             (settings.ADMIN_EMAIL, settings.ADMIN_PASSWORD, settings.ADMIN_NAME, "admin"),
             (settings.USER_EMAIL, settings.USER_PASSWORD, settings.USER_NAME, "user"),
         ]:
-            email = email.strip().lower()
-            existing = db.query(User).filter(User.email == email).first()
-            if existing:
-                existing.role = role
-                existing.full_name = name
-            else:
-                db.add(
-                    User(
-                        email=email,
-                        hashed_password=hash_password(password),
-                        full_name=name,
-                        role=role,
-                    )
+            db.add(
+                User(
+                    email=email.strip().lower(),
+                    hashed_password=hash_password(password),
+                    full_name=name,
+                    role=role,
                 )
+            )
         db.commit()
     finally:
         db.close()
@@ -79,6 +81,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(users.router)
 app.include_router(customers.router)
 app.include_router(stock.router)
 app.include_router(bills.router)

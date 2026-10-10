@@ -45,7 +45,9 @@ Then open **http://localhost:5173**.
 | Admin | `ADMIN_EMAIL` | `ADMIN_PASSWORD` | Everything, including the money-sensitive side: Dashboard, cost prices & profit, Purchases, Suppliers, Supplier ledger, Expenses |
 | User | `USER_EMAIL` | `USER_PASSWORD` | Customers, Store (qty & selling price only), Bills & Ledger, Customer/Salesman/Item ledgers |
 
-Both accounts are created automatically from the values you set in `backend/.env` — there are no built-in defaults, so the backend will refuse to start until you choose a `SECRET_KEY` and both passwords. To change a password later, edit `backend/.env` and re-run `python init_db.py` (or restart the backend).
+These two accounts are created from `backend/.env` **the first time the app starts on an empty database**. After that, accounts are managed in the app (**Settings**): names, emails, roles, passwords and profile pictures — the `.env` values are never re-applied, so changing them later has no effect on existing accounts.
+
+Passwords must be at least 8 characters with an uppercase letter, a lowercase letter, a number and a special character; the API enforces this for every account.
 
 ---
 
@@ -118,6 +120,14 @@ Four complete track records, each filterable and printable. Reachable from the *
 - **Is the business growing?** — Sales, gross profit, net profit and expenses over time (daily / weekly / monthly / yearly).
 - What sold, where the money went (expenses by category), bills, top customers and a low-stock watch list, all for the chosen period.
 - Profit is counted on the **sale date** (when billed), not when the customer pays. Bills sold before a cost price was set fall back to the item's current cost; the dashboard warns when a period contains lines with no cost at all.
+
+### Settings
+- **My profile** — your name, sign-in email and profile picture (shown at the top right with your role).
+- **Change password** — requires the current password; the new one must meet the complexity rules above.
+- **People who can sign in** (admin) — add staff or admins, edit name/email/role, reset a password, remove an account. There must always be at least one admin, and you cannot remove yourself.
+
+### Layout
+The app is responsive: on laptops the sidebar is always visible; on tablets and phones it becomes a drawer behind the ☰ button, forms stack into one column and wide tables scroll sideways.
 
 ### Receipts
 Uploaded receipts (purchases, bills, expenses) are stored **in the database**, not on disk, so they survive Render redeploys. Photos are downscaled to 1600px JPEG on upload; PDFs are kept as-is. Max 8 MB per file.

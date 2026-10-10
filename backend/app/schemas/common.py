@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -15,15 +15,49 @@ class LoginIn(BaseModel):
 
 
 class UserOut(BaseModel):
+    id: int
     email: str
     full_name: Optional[str] = None
     role: str
+    has_avatar: bool = False
+    avatar_updated_at: Optional[str] = None
+    created_at: Optional[str] = None
 
 
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserOut
+
+
+class ProfileUpdate(BaseModel):
+    full_name: str = Field(min_length=1, max_length=255)
+    email: str = Field(min_length=3, max_length=255)
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=1)
+
+
+Role = Literal["admin", "user"]
+
+
+class UserCreate(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    full_name: str = Field(min_length=1, max_length=255)
+    role: Role
+    password: str = Field(min_length=1)
+
+
+class UserAdminUpdate(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    full_name: str = Field(min_length=1, max_length=255)
+    role: Role
+
+
+class PasswordReset(BaseModel):
+    new_password: str = Field(min_length=1)
 
 
 # ------------------------------------------------------------------ customers

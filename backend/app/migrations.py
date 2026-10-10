@@ -13,6 +13,9 @@ COLUMNS: list[tuple[str, str, str]] = [
     ("stock", "cost_price", "NUMERIC(12,2)"),
     ("bill_items", "cost_price", "NUMERIC(12,2)"),
     ("bills", "receipt_id", "INTEGER REFERENCES receipts(id)"),
+    ("users", "avatar", "BYTEA"),
+    ("users", "avatar_type", "VARCHAR(50)"),
+    ("users", "avatar_updated_at", "TIMESTAMP"),
 ]
 
 
@@ -28,7 +31,7 @@ def run_migrations(engine: Engine) -> None:
             if engine.dialect.name == "sqlite":
                 # SQLite cannot add a REFERENCES clause after the fact; the
                 # relationship is enforced by the ORM there anyway.
-                ddl = ddl.split(" REFERENCES ")[0]
+                ddl = ddl.split(" REFERENCES ")[0].replace("BYTEA", "BLOB")
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
             else:
                 conn.execute(
