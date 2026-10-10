@@ -7,6 +7,7 @@ from ..core.deps import get_current_user
 from ..database import get_db
 from ..models import Bill, Customer
 from ..schemas.common import CustomerCreate, CustomerUpdate
+from ..utils.dates import local_day_to_utc
 from ..utils.serialize import customer_to_dict
 from ..utils.tables import import_customers, read_upload, template_response
 
@@ -55,6 +56,7 @@ def create_customer(payload: CustomerCreate, db: Session = Depends(get_db)):
         phone_number=payload.phone_number.strip(),
         shop_name=(payload.shop_name or "").strip() or None,
         address=(payload.address or "").strip() or None,
+        created_at=local_day_to_utc(payload.created_date, payload.tz_offset),
     )
     db.add(customer)
     db.commit()
@@ -73,6 +75,8 @@ def update_customer(
     customer.phone_number = payload.phone_number.strip()
     customer.shop_name = (payload.shop_name or "").strip() or None
     customer.address = (payload.address or "").strip() or None
+    if payload.created_date:
+        customer.created_at = local_day_to_utc(payload.created_date, payload.tz_offset)
     db.commit()
     db.refresh(customer)
     return customer_to_dict(customer)

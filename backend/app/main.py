@@ -6,8 +6,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .core.security import hash_password
 from .database import Base, SessionLocal, engine
+from .migrations import run_migrations
 from .models import User
-from .routers import auth, bills, customers, dashboard, ledgers, stock
+from .routers import (
+    auth,
+    bills,
+    customers,
+    dashboard,
+    expenses,
+    ledgers,
+    purchases,
+    receipts,
+    stock,
+    suppliers,
+)
 from .utils.pdf import bills_dir
 
 
@@ -42,6 +54,7 @@ def seed_default_users() -> None:
 async def lifespan(app: FastAPI):
     # Safety net: if init_db.py wasn't run, still create tables and seed users.
     Base.metadata.create_all(bind=engine)
+    run_migrations(engine)  # columns added to tables that already existed
     seed_default_users()
     bills_dir()  # make sure the bill-slip directory exists
     yield
@@ -50,7 +63,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Mughal Sticker API",
     version="1.0.0",
-    description="Customers, Store inventory, Bills & Ledger, and Dashboard analytics.",
+    description=(
+        "Customers, Store inventory, Purchases & Suppliers, Bills & Ledger, "
+        "Expenses, and Dashboard analytics."
+    ),
     lifespan=lifespan,
 )
 
@@ -66,6 +82,10 @@ app.include_router(auth.router)
 app.include_router(customers.router)
 app.include_router(stock.router)
 app.include_router(bills.router)
+app.include_router(suppliers.router)
+app.include_router(purchases.router)
+app.include_router(expenses.router)
+app.include_router(receipts.router)
 app.include_router(ledgers.router)
 app.include_router(dashboard.router)
 

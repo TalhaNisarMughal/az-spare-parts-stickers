@@ -30,8 +30,10 @@ class Bill(Base):
     status = Column(String(10), nullable=False, default="open")  # open | closed
     purchase_date = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     last_modified = Column(DateTime, default=datetime.utcnow, nullable=False)
+    receipt_id = Column(Integer, ForeignKey("receipts.id"), nullable=True)  # optional sales receipt
 
     customer = relationship("Customer")
+    receipt = relationship("Receipt")
     items = relationship(
         "BillItem", cascade="all, delete-orphan", backref="bill", order_by="BillItem.id"
     )
@@ -64,6 +66,10 @@ class BillItem(Base):
     discount_percent = Column(Numeric(6, 2), nullable=False, default=0)
     qty = Column(Integer, nullable=False)
     line_total = Column(Numeric(14, 2), nullable=False)
+    # Buying cost per unit at the moment of sale, so profit on this line never
+    # drifts when later purchases change the item's average cost. NULL on bills
+    # made before cost tracking existed; those fall back to the item's cost.
+    cost_price = Column(Numeric(12, 2), nullable=True)
 
     __table_args__ = (CheckConstraint("qty > 0", name="ck_bill_items_qty_positive"),)
 

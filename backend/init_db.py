@@ -12,6 +12,7 @@ from pathlib import Path
 from app.config import settings
 from app.database import Base, engine
 from app.main import seed_default_users
+from app.migrations import run_migrations
 
 
 def apply_schema() -> None:
@@ -19,6 +20,7 @@ def apply_schema() -> None:
     if url.startswith("sqlite"):
         print("SQLite detected — creating tables from models…")
         Base.metadata.create_all(bind=engine)
+        run_migrations(engine)
         return
 
     schema_path = Path(__file__).resolve().parent.parent / "database" / "schema.sql"
@@ -40,6 +42,7 @@ def apply_schema() -> None:
 
     # Safety net for anything the file may have missed.
     Base.metadata.create_all(bind=engine)
+    run_migrations(engine)
 
 
 def main() -> int:

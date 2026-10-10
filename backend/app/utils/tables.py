@@ -26,12 +26,13 @@ CUSTOMER_SAMPLE = {
     "address": "Shop 12, Main Bazaar, Lahore",
 }
 
-STOCK_COLUMNS = ["stock_barcode", "stock_name", "qty", "unit_price"]
+STOCK_COLUMNS = ["stock_barcode", "stock_name", "qty", "unit_price", "cost_price"]
 STOCK_SAMPLE = {
     "stock_barcode": "BC-1001",
     "stock_name": "Steel Bolt 10mm",
     "qty": "100",
     "unit_price": "25.50",
+    "cost_price": "18.00",
 }
 
 
@@ -132,7 +133,8 @@ def import_customers(df: pd.DataFrame, db: Session) -> dict:
     return {"inserted": inserted, "skipped": len(errors), "errors": errors}
 
 
-def import_stock(df: pd.DataFrame, db: Session) -> dict:
+def import_stock(df: pd.DataFrame, db: Session, allow_cost: bool = False) -> dict:
+    """`cost_price` is an optional column; it is only honoured for the admin."""
     _require_columns(df, ["stock_barcode", "stock_name", "qty", "unit_price"], "Store")
 
     existing = {s[0] for s in db.query(Stock.stock_barcode).all()}
@@ -145,6 +147,7 @@ def import_stock(df: pd.DataFrame, db: Session) -> dict:
         name = row.get("stock_name", "")
         qty_raw = row.get("qty", "")
         price_raw = row.get("unit_price", "")
+        cost_raw = row.get("cost_price", "") if allow_cost else ""
 
         if not any([barcode, name, qty_raw, price_raw]):
             continue
@@ -178,7 +181,17 @@ def import_stock(df: pd.DataFrame, db: Session) -> dict:
             errors.append({"row": row_no, "error": f"Unit Price '{price_raw}' must be a number of 0 or more."})
             continue
 
-        db.add(Stock(stock_barcode=barcode, stock_name=name, qty=qty, unit_price=price))
+        cost = None
+        if cost_raw:
+            try:
+                cost = Decimal(cost_raw)
+                if cost < 0:
+                    raise InvalidOperation
+            except (InvalidOperation, ValueError):
+                errors.append({"row": row_no, "error": f"Cost Price '{cost_raw}' must be a number of 0 or more."})
+                continue
+
+        db.add(Stock(stock_barcode=barcode, stock_name=name, qty=qty, unit_price=price, cost_price=cost))
         seen_in_file.add(barcode)
         inserted += 1
 

@@ -2,21 +2,29 @@ import os
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from ..core.deps import get_current_user
 from ..database import get_db
-from ..models import Bill, BillItem, BillPayment, Counter, Customer, Stock
+from ..models import Bill, BillItem, BillPayment, Counter, Customer, Stock, User
 from ..schemas.bill import BillCreate, BillUpdate, PaymentIn, StatusIn
+from ..utils.costing import current_costs
+from ..utils.dates import local_day_to_utc
 from ..utils.pdf import bill_pdf_path, generate_bill_pdf
+from ..utils.receipts import remove_receipt, replace_receipt
 from ..utils.serialize import bill_to_dict
 
-router = APIRouter(
-    prefix="/api/bills", tags=["bills"], dependencies=[Depends(get_current_user)]
-)
+router = APIRouter(prefix="/api/bills", tags=["bills"])
+
+
+def _out(bill: Bill, user: User, db: Session) -> dict:
+    """Serialize for the caller: the admin also gets cost + profit figures."""
+    if user.role != "admin":
+        return bill_to_dict(bill)
+    return bill_to_dict(bill, admin=True, fallback_costs=current_costs(db))
 
 TWO = Decimal("0.01")
 
@@ -50,7 +58,12 @@ def next_bill_id(db: Session) -> str:
 def _load_bill(db: Session, bill_id: str) -> Bill:
     bill = (
         db.query(Bill)
-        .options(joinedload(Bill.items), joinedload(Bill.payments), joinedload(Bill.customer))
+        .options(
+            joinedload(Bill.items),
+            joinedload(Bill.payments),
+            joinedload(Bill.customer),
+            joinedload(Bill.receipt),
+        )
         .filter(Bill.bill_id == bill_id)
         .first()
     )
@@ -88,10 +101,18 @@ def _resolve_customer(payload: BillCreate, db: Session) -> Customer:
     return customer
 
 
-def _build_items(bill: Bill, items_in, db: Session) -> Decimal:
-    """Validate items, deduct stock, attach BillItem rows. Returns the net total."""
+def _build_items(
+    bill: Bill, items_in, db: Session, keep_costs: dict[str, Decimal | None] | None = None
+) -> Decimal:
+    """Validate items, deduct stock, attach BillItem rows. Returns the net total.
+
+    Each line snapshots the item's cost price at this moment so later purchases
+    never change the profit of an old sale. When editing, `keep_costs` carries
+    the snapshots the bill already had so an edit does not re-cost old lines.
+    """
     net = Decimal("0.00")
     seen: set[str] = set()
+    keep_costs = keep_costs or {}
 
     for it in items_in:
         barcode = it.stock_barcode.strip()
@@ -130,6 +151,11 @@ def _build_items(bill: Bill, items_in, db: Session) -> Decimal:
 
         stock.qty = available - it.qty  # deduct from inventory
 
+        if barcode in keep_costs:
+            cost = keep_costs[barcode]
+        else:
+            cost = d2(stock.cost_price) if stock.cost_price is not None else None
+
         bill.items.append(
             BillItem(
                 stock_barcode=barcode,
@@ -140,6 +166,7 @@ def _build_items(bill: Bill, items_in, db: Session) -> Decimal:
                 discount_percent=discount_pct,
                 qty=it.qty,
                 line_total=line_total,
+                cost_price=cost,
             )
         )
     return net.quantize(TWO)
@@ -153,12 +180,18 @@ def list_bills(
     date_to: str | None = Query(None, description="YYYY-MM-DD (local)"),
     status: str | None = Query(None, pattern="^(open|closed)$"),
     tz_offset: int = Query(0, description="JS getTimezoneOffset(): minutes (UTC - local)"),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     query = (
         db.query(Bill)
         .join(Customer, Bill.customer_code == Customer.customer_code)
-        .options(joinedload(Bill.items), joinedload(Bill.payments), joinedload(Bill.customer))
+        .options(
+            joinedload(Bill.items),
+            joinedload(Bill.payments),
+            joinedload(Bill.customer),
+            joinedload(Bill.receipt),
+        )
     )
 
     if q and q.strip():
@@ -190,14 +223,19 @@ def list_bills(
         query = query.filter(Bill.status == status)
 
     bills = query.order_by(Bill.purchase_date.desc()).limit(1000).all()
-    return [bill_to_dict(b) for b in bills]
+    if user.role != "admin":
+        return [bill_to_dict(b) for b in bills]
+    costs = current_costs(db)
+    return [bill_to_dict(b, admin=True, fallback_costs=costs) for b in bills]
 
 
 # ------------------------------------------------------------------- create
 @router.post("", status_code=201)
-def create_bill(payload: BillCreate, db: Session = Depends(get_db)):
+def create_bill(
+    payload: BillCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     customer = _resolve_customer(payload, db)
-    now = datetime.utcnow()
+    now = local_day_to_utc(payload.purchase_date, payload.tz_offset)  # manual date of sale
 
     bill = Bill(
         bill_id=next_bill_id(db),
@@ -205,7 +243,7 @@ def create_bill(payload: BillCreate, db: Session = Depends(get_db)):
         salesman_name=payload.salesman_name.strip(),
         payment_type=payload.payment_type,
         purchase_date=now,
-        last_modified=now,  # same as purchase date on first creation
+        last_modified=datetime.utcnow(),
     )
     db.add(bill)
 
@@ -227,17 +265,22 @@ def create_bill(payload: BillCreate, db: Session = Depends(get_db)):
     db.commit()
     bill = _load_bill(db, bill.bill_id)
     generate_bill_pdf(bill)
-    return bill_to_dict(bill)
+    return _out(bill, user, db)
 
 
 # ---------------------------------------------------------------- single/edit
 @router.get("/{bill_id}")
-def get_bill(bill_id: str, db: Session = Depends(get_db)):
-    return bill_to_dict(_load_bill(db, bill_id))
+def get_bill(bill_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return _out(_load_bill(db, bill_id), user, db)
 
 
 @router.put("/{bill_id}")
-def update_bill(bill_id: str, payload: BillUpdate, db: Session = Depends(get_db)):
+def update_bill(
+    bill_id: str,
+    payload: BillUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     bill = _load_bill(db, bill_id)
 
     customer = db.get(Customer, payload.customer_code)
@@ -246,7 +289,9 @@ def update_bill(bill_id: str, payload: BillUpdate, db: Session = Depends(get_db)
 
     # Return previously reserved quantities to the store first, so removed items
     # come back to inventory and new quantities validate against true availability.
+    keep_costs: dict[str, Decimal | None] = {}
     for it in bill.items:
+        keep_costs[it.stock_barcode] = d2(it.cost_price) if it.cost_price is not None else None
         stock = db.get(Stock, it.stock_barcode)
         if stock:
             stock.qty += it.qty
@@ -256,8 +301,10 @@ def update_bill(bill_id: str, payload: BillUpdate, db: Session = Depends(get_db)
     bill.customer_code = customer.customer_code
     bill.salesman_name = payload.salesman_name.strip()
     bill.payment_type = payload.payment_type
+    if payload.purchase_date:
+        bill.purchase_date = local_day_to_utc(payload.purchase_date, payload.tz_offset)
 
-    net = _build_items(bill, payload.items, db)
+    net = _build_items(bill, payload.items, db, keep_costs)
     if bill.deposited_amount > net:
         raise HTTPException(
             400,
@@ -274,11 +321,11 @@ def update_bill(bill_id: str, payload: BillUpdate, db: Session = Depends(get_db)
     db.commit()
     bill = _load_bill(db, bill_id)
     generate_bill_pdf(bill)
-    return bill_to_dict(bill)
+    return _out(bill, user, db)
 
 
 @router.delete("/{bill_id}")
-def delete_bill(bill_id: str, db: Session = Depends(get_db)):
+def delete_bill(bill_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     bill = _load_bill(db, bill_id)
 
     # Return the billed quantities to the store before deleting.
@@ -287,6 +334,7 @@ def delete_bill(bill_id: str, db: Session = Depends(get_db)):
         if stock:
             stock.qty += it.qty
 
+    remove_receipt(bill, db)
     db.delete(bill)
     db.commit()
 
@@ -298,7 +346,12 @@ def delete_bill(bill_id: str, db: Session = Depends(get_db)):
 
 # ----------------------------------------------------------------- payments
 @router.post("/{bill_id}/payments")
-def add_payment(bill_id: str, payload: PaymentIn, db: Session = Depends(get_db)):
+def add_payment(
+    bill_id: str,
+    payload: PaymentIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     bill = _load_bill(db, bill_id)
     amount = d2(payload.amount)
     if amount <= 0:
@@ -309,37 +362,71 @@ def add_payment(bill_id: str, payload: PaymentIn, db: Session = Depends(get_db))
             f"Payment of Rs {amount} is more than the remaining balance of Rs {bill.remaining_balance}.",
         )
 
-    now = datetime.utcnow()
+    when = local_day_to_utc(payload.payment_date, payload.tz_offset)
+    if when < bill.purchase_date:
+        raise HTTPException(400, "A deposit cannot be dated before the bill itself.")
     bill.payments.append(
-        BillPayment(amount=amount, payment_date=now, note=(payload.note or "").strip() or None)
+        BillPayment(amount=amount, payment_date=when, note=(payload.note or "").strip() or None)
     )
     bill.deposited_amount = (bill.deposited_amount + amount).quantize(TWO)
     bill.remaining_balance = (bill.remaining_balance - amount).quantize(TWO)
-    bill.last_modified = now
+    bill.last_modified = datetime.utcnow()
     if bill.remaining_balance == 0:
         bill.status = "closed"  # balance cleared — ledger closes automatically
 
     db.commit()
     bill = _load_bill(db, bill_id)
     generate_bill_pdf(bill)
-    return bill_to_dict(bill)
+    return _out(bill, user, db)
 
 
 # ------------------------------------------------------------------- status
 @router.patch("/{bill_id}/status")
-def set_status(bill_id: str, payload: StatusIn, db: Session = Depends(get_db)):
+def set_status(
+    bill_id: str,
+    payload: StatusIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     bill = _load_bill(db, bill_id)
     bill.status = payload.status
     bill.last_modified = datetime.utcnow()
     db.commit()
     bill = _load_bill(db, bill_id)
     generate_bill_pdf(bill)
-    return bill_to_dict(bill)
+    return _out(bill, user, db)
+
+
+# ------------------------------------------------------------------ receipt
+@router.post("/{bill_id}/receipt")
+def upload_receipt(
+    bill_id: str,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Attach (or replace) the sales receipt handed to the customer."""
+    bill = _load_bill(db, bill_id)
+    replace_receipt(bill, file, "bill", db)
+    bill.last_modified = datetime.utcnow()
+    db.commit()
+    return _out(_load_bill(db, bill_id), user, db)
+
+
+@router.delete("/{bill_id}/receipt")
+def delete_receipt(
+    bill_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    bill = _load_bill(db, bill_id)
+    remove_receipt(bill, db)
+    bill.last_modified = datetime.utcnow()
+    db.commit()
+    return _out(_load_bill(db, bill_id), user, db)
 
 
 # ---------------------------------------------------------------------- pdf
 @router.get("/{bill_id}/pdf")
-def get_bill_pdf(bill_id: str, db: Session = Depends(get_db)):
+def get_bill_pdf(bill_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     bill = _load_bill(db, bill_id)
     path = bill_pdf_path(bill.bill_id)
     if not os.path.exists(path):

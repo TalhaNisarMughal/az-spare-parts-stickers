@@ -2,7 +2,7 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from .common import CustomerCreate
+from .common import CustomerCreate, DateStr
 
 PaymentType = Literal["Debit", "Credit", "Cash", "Cheque"]
 
@@ -25,6 +25,8 @@ class BillCreate(BaseModel):
     payment_type: PaymentType
     items: List[BillItemIn] = Field(min_length=1)
     deposited_amount: float = Field(default=0, ge=0)
+    purchase_date: DateStr = None  # manual date of sale; empty = now
+    tz_offset: int = 0
 
 
 class BillUpdate(BaseModel):
@@ -32,11 +34,15 @@ class BillUpdate(BaseModel):
     salesman_name: str = Field(min_length=1, max_length=255)
     payment_type: PaymentType
     items: List[BillItemIn] = Field(min_length=1)
+    purchase_date: DateStr = None
+    tz_offset: int = 0
 
 
 class PaymentIn(BaseModel):
     amount: float = Field(gt=0)
     note: Optional[str] = None
+    payment_date: DateStr = None
+    tz_offset: int = 0
 
 
 class StatusIn(BaseModel):

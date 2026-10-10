@@ -11,6 +11,8 @@ Three read-only analytical views over the same bill data:
   generated. Grouped by customer and by item, with links back to each bill.
 * **Item ledger** — where one stock item went: which customers bought it, in
   what quantity, on what date, and what it earned.
+* **Supplier ledger** (admin only) — the mirror image of the customer ledger:
+  purchases are what the shop owes, payments are what it has handed over.
 
 Money note: payments are recorded per *bill*, not per line item. So the
 paid/outstanding figures on an item or salesman line are the line's
@@ -25,10 +27,15 @@ from fastapi.responses import Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from ..core.deps import get_current_user
+from ..core.deps import get_current_user, require_admin
 from ..database import get_db
-from ..models import Bill, BillItem, Customer, Stock
-from ..utils.ledger_pdf import customer_ledger_pdf, item_ledger_pdf, salesman_ledger_pdf
+from ..models import Bill, BillItem, Customer, Purchase, Stock, Supplier, User
+from ..utils.ledger_pdf import (
+    customer_ledger_pdf,
+    item_ledger_pdf,
+    salesman_ledger_pdf,
+    supplier_ledger_pdf,
+)
 from ..utils.serialize import f2, iso
 
 router = APIRouter(
@@ -121,11 +128,11 @@ def _share(line_total: Decimal, bill_net: Decimal, amount: Decimal) -> Decimal:
 
 # ---------------------------------------------------------------- directory
 @router.get("/directory")
-def directory(db: Session = Depends(get_db)):
-    """Pickers for the three ledgers, each with a headline figure.
+def directory(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Pickers for the ledgers, each with a headline figure.
 
     Customers and items with no sales yet are still listed so their (empty)
-    ledger can be opened.
+    ledger can be opened. Suppliers are only included for the admin.
     """
     bill_agg = dict(
         db.query(
@@ -247,7 +254,40 @@ def directory(db: Session = Depends(get_db)):
             }
         )
 
-    return {"customers": customers, "salesmen": salesmen_out, "items": items}
+    suppliers_out = []
+    if user.role == "admin":
+        pagg = {
+            sid: row
+            for sid, *row in db.query(
+                Purchase.supplier_id,
+                func.count(Purchase.id),
+                func.coalesce(func.sum(Purchase.total_cost), 0),
+                func.coalesce(func.sum(Purchase.remaining_balance), 0),
+                func.max(Purchase.purchase_date),
+            )
+            .group_by(Purchase.supplier_id)
+            .all()
+        }
+        for sup in db.query(Supplier).order_by(Supplier.name).all():
+            count, bought, due, last = pagg.get(sup.id, (0, 0, 0, None))
+            suppliers_out.append(
+                {
+                    "id": sup.id,
+                    "name": sup.name,
+                    "phone": sup.phone,
+                    "purchases": int(count),
+                    "total_bought": f2(bought),
+                    "outstanding": f2(due),
+                    "last_purchase": iso(last),
+                }
+            )
+
+    return {
+        "customers": customers,
+        "salesmen": salesmen_out,
+        "items": items,
+        "suppliers": suppliers_out,
+    }
 
 
 # --------------------------------------------------------- customer ledger
@@ -932,6 +972,190 @@ def item_ledger(
     )
 
 
+# --------------------------------------------------------- supplier ledger
+def build_supplier_ledger(
+    db: Session,
+    supplier_id: int,
+    date_from: str | None,
+    date_to: str | None,
+    status: str | None,
+    q: str | None,
+    tz_offset: int,
+) -> dict:
+    """The customer ledger turned around: purchases are debits (what the shop
+    owes the supplier), payments are credits, with a true running balance."""
+    supplier = db.get(Supplier, supplier_id)
+    if not supplier:
+        raise HTTPException(404, "Supplier was not found.")
+
+    start, end = parse_window(date_from, date_to, tz_offset)
+
+    purchases = (
+        db.query(Purchase)
+        .options(joinedload(Purchase.payments), joinedload(Purchase.stock), joinedload(Purchase.receipt))
+        .filter(Purchase.supplier_id == supplier_id)
+        .order_by(Purchase.purchase_date, Purchase.id)
+        .all()
+    )
+
+    events = []
+    for p in purchases:
+        item_name = p.stock.stock_name if p.stock else p.stock_barcode
+        events.append(
+            {
+                "kind": "purchase",
+                "_dt": p.purchase_date,
+                "_seq": 0,
+                "_p": p,
+                "date": iso(p.purchase_date),
+                "purchase_id": p.id,
+                "particulars": f"{item_name} x{p.qty} @ Rs {d2(p.cost_price)}",
+                "stock_barcode": p.stock_barcode,
+                "item_name": item_name,
+                "status": p.status,
+                "units": p.qty,
+                "debit": f2(p.total_cost),
+                "credit": 0.0,
+                "note": p.note,
+                "receipt_id": p.receipt_id,
+            }
+        )
+        for pay in p.payments:
+            events.append(
+                {
+                    "kind": "payment",
+                    "_dt": pay.payment_date,
+                    "_seq": 1,
+                    "_p": p,
+                    "date": iso(pay.payment_date),
+                    "purchase_id": p.id,
+                    "particulars": pay.note or "Payment made",
+                    "stock_barcode": p.stock_barcode,
+                    "item_name": item_name,
+                    "status": p.status,
+                    "units": None,
+                    "debit": 0.0,
+                    "credit": f2(pay.amount),
+                    "note": pay.note,
+                    "receipt_id": None,
+                }
+            )
+
+    events.sort(key=lambda e: (e["_dt"], e["_seq"], e["purchase_id"]))
+
+    running = ZERO
+    opening = ZERO
+    for e in events:
+        running += d2(e["debit"]) - d2(e["credit"])
+        e["balance"] = f2(running)
+        if start and e["_dt"] < start:
+            opening = running
+    closing = running
+
+    needle = (q or "").strip().lower()
+
+    def matches(e) -> bool:
+        if not in_window(e["_dt"], start, end):
+            return False
+        if status and e["status"] != status:
+            return False
+        if needle:
+            hay = " ".join(
+                [str(e["purchase_id"]), e["particulars"] or "", e["item_name"] or "", e["stock_barcode"] or "", e["note"] or ""]
+            ).lower()
+            if needle not in hay:
+                return False
+        return True
+
+    rows = [e for e in events if matches(e)]
+    purchase_rows = [e for e in rows if e["kind"] == "purchase"]
+    period_bought = sum((d2(e["debit"]) for e in rows), ZERO)
+    period_paid = sum((d2(e["credit"]) for e in rows), ZERO)
+
+    item_totals: dict[str, dict] = {}
+    for e in purchase_rows:
+        p = e["_p"]
+        t = item_totals.setdefault(
+            p.stock_barcode,
+            {"stock_barcode": p.stock_barcode, "item_name": e["item_name"], "qty": 0, "amount": ZERO, "lots": 0},
+        )
+        t["qty"] += p.qty
+        t["amount"] += d2(p.total_cost)
+        t["lots"] += 1
+    top_items = sorted(
+        ({**t, "amount": f2(t["amount"]), "avg_cost": f2(t["amount"] / t["qty"]) if t["qty"] else 0.0} for t in item_totals.values()),
+        key=lambda t: t["amount"],
+        reverse=True,
+    )
+
+    shown = [
+        {
+            "id": p.id,
+            "purchase_date": iso(p.purchase_date),
+            "stock_barcode": p.stock_barcode,
+            "item_name": p.stock.stock_name if p.stock else p.stock_barcode,
+            "qty": p.qty,
+            "cost_price": f2(p.cost_price),
+            "total_cost": f2(p.total_cost),
+            "paid_amount": f2(p.paid_amount),
+            "remaining_balance": f2(p.remaining_balance),
+            "status": p.status,
+            "note": p.note,
+            "receipt_id": p.receipt_id,
+        }
+        for p in (e["_p"] for e in purchase_rows)
+    ]
+
+    for e in events:
+        e.pop("_dt", None)
+        e.pop("_seq", None)
+        e.pop("_p", None)
+
+    return {
+        "supplier": {
+            "id": supplier.id,
+            "name": supplier.name,
+            "phone": supplier.phone,
+            "address": supplier.address,
+            "notes": supplier.notes,
+            "created_at": iso(supplier.created_at),
+        },
+        "filters": {"date_from": date_from, "date_to": date_to, "status": status, "q": q},
+        "opening_balance": f2(opening),
+        "closing_balance": f2(closing),
+        "summary": {
+            "period_purchases": len(purchase_rows),
+            "period_units": sum(e["units"] or 0 for e in purchase_rows),
+            "period_bought": f2(period_bought),
+            "period_paid": f2(period_paid),
+            "all_time_purchases": len(purchases),
+            "all_time_bought": f2(sum((d2(p.total_cost) for p in purchases), ZERO)),
+            "all_time_paid": f2(sum((d2(p.paid_amount) for p in purchases), ZERO)),
+            "outstanding": f2(closing),
+            "open_purchases": sum(1 for p in purchases if p.status == "open"),
+            "closed_purchases": sum(1 for p in purchases if p.status == "closed"),
+            "first_purchase": iso(purchases[0].purchase_date) if purchases else None,
+            "last_purchase": iso(purchases[-1].purchase_date) if purchases else None,
+        },
+        "entries": rows,
+        "purchases": shown,
+        "top_items": top_items,
+    }
+
+
+@router.get("/supplier", dependencies=[Depends(require_admin)])
+def supplier_ledger(
+    id: int = Query(..., description="Supplier id"),
+    date_from: str | None = Query(None, description="YYYY-MM-DD (local)"),
+    date_to: str | None = Query(None, description="YYYY-MM-DD (local)"),
+    status: str | None = Query(None, pattern="^(open|closed)$"),
+    q: str | None = None,
+    tz_offset: int = Query(0),
+    db: Session = Depends(get_db),
+):
+    return build_supplier_ledger(db, id, date_from, date_to, status, q, tz_offset)
+
+
 # ---------------------------------------------------------------- pdf views
 def _pdf_response(payload: bytes, filename: str) -> Response:
     """Ledger PDFs are built per request (they depend on the active filters),
@@ -1004,4 +1228,20 @@ def item_ledger_pdf_view(
     )
     return _pdf_response(
         item_ledger_pdf(data), f"item-ledger-{_slug(data['item']['stock_barcode'])}.pdf"
+    )
+
+
+@router.get("/supplier/pdf", dependencies=[Depends(require_admin)])
+def supplier_ledger_pdf_view(
+    id: int = Query(...),
+    date_from: str | None = None,
+    date_to: str | None = None,
+    status: str | None = Query(None, pattern="^(open|closed)$"),
+    q: str | None = None,
+    tz_offset: int = Query(0),
+    db: Session = Depends(get_db),
+):
+    data = build_supplier_ledger(db, id, date_from, date_to, status, q, tz_offset)
+    return _pdf_response(
+        supplier_ledger_pdf(data), f"supplier-ledger-{_slug(data['supplier']['name'])}.pdf"
     )

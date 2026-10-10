@@ -1,5 +1,7 @@
 from decimal import Decimal
 
+from .receipts import receipt_to_dict
+
 
 def iso(dt) -> str | None:
     """Naive UTC datetime -> ISO string with Z so browsers render local time."""
@@ -23,19 +25,94 @@ def customer_to_dict(c) -> dict:
     }
 
 
-def stock_to_dict(s) -> dict:
-    return {
+def stock_to_dict(s, *, admin: bool = False) -> dict:
+    """Cost price is money-sensitive: only the admin sees it."""
+    out = {
         "stock_barcode": s.stock_barcode,
         "stock_name": s.stock_name,
         "qty": s.qty,
         "unit_price": f2(s.unit_price),
         "created_at": iso(s.created_at),
     }
+    if admin:
+        cost = f2(s.cost_price)
+        price = f2(s.unit_price) or 0.0
+        out["cost_price"] = cost
+        out["margin"] = None if cost is None else round(price - cost, 2)
+        out["margin_percent"] = (
+            None if cost is None or cost == 0 else round((price - cost) / cost * 100, 2)
+        )
+    return out
 
 
-def bill_to_dict(b) -> dict:
-    c = b.customer
+def supplier_to_dict(s) -> dict:
     return {
+        "id": s.id,
+        "name": s.name,
+        "phone": s.phone,
+        "address": s.address,
+        "notes": s.notes,
+        "created_at": iso(s.created_at),
+    }
+
+
+def purchase_to_dict(p) -> dict:
+    sup = p.supplier
+    st = p.stock
+    return {
+        "id": p.id,
+        "supplier_id": p.supplier_id,
+        "supplier_name": sup.name if sup else None,
+        "stock_barcode": p.stock_barcode,
+        "stock_name": st.stock_name if st else None,
+        "qty": p.qty,
+        "cost_price": f2(p.cost_price),
+        "total_cost": f2(p.total_cost),
+        "paid_amount": f2(p.paid_amount),
+        "remaining_balance": f2(p.remaining_balance),
+        "status": p.status,
+        "purchase_date": iso(p.purchase_date),
+        "note": p.note,
+        "receipt": receipt_to_dict(p.receipt),
+        "created_at": iso(p.created_at),
+        "last_modified": iso(p.last_modified),
+        "payments": [
+            {
+                "id": pay.id,
+                "amount": f2(pay.amount),
+                "payment_date": iso(pay.payment_date),
+                "note": pay.note,
+            }
+            for pay in p.payments
+        ],
+    }
+
+
+def expense_to_dict(e) -> dict:
+    return {
+        "id": e.id,
+        "expense_date": iso(e.expense_date),
+        "category": e.category,
+        "amount": f2(e.amount),
+        "paid_to": e.paid_to,
+        "note": e.note,
+        "receipt": receipt_to_dict(e.receipt),
+        "created_at": iso(e.created_at),
+    }
+
+
+def line_cost(it, fallback_costs: dict | None = None):
+    """Cost per unit for a bill line: the sale-time snapshot, else the item's
+    current average cost (for bills made before cost tracking). None = unknown."""
+    if it.cost_price is not None:
+        return Decimal(str(it.cost_price))
+    fb = (fallback_costs or {}).get(it.stock_barcode)
+    return Decimal(str(fb)) if fb is not None else None
+
+
+def bill_to_dict(b, *, admin: bool = False, fallback_costs: dict | None = None) -> dict:
+    c = b.customer
+    out = {
         "bill_id": b.bill_id,
         "customer_code": b.customer_code,
         "customer_name": c.customer_name if c else None,
@@ -49,6 +126,7 @@ def bill_to_dict(b) -> dict:
         "status": b.status,
         "purchase_date": iso(b.purchase_date),
         "last_modified": iso(b.last_modified),
+        "receipt": receipt_to_dict(b.receipt),
         "items": [
             {
                 "id": it.id,
@@ -73,3 +151,21 @@ def bill_to_dict(b) -> dict:
             for p in b.payments
         ],
     }
+    if admin:
+        # Profit per line: line total - cost x qty. Unknown cost on any line
+        # makes the bill's profit unknown rather than silently too high.
+        total_cost = Decimal("0")
+        known = True
+        for it, line in zip(b.items, out["items"]):
+            cost = line_cost(it, fallback_costs)
+            line["cost_price"] = f2(cost)
+            if cost is None:
+                known = False
+                line["profit"] = None
+            else:
+                lc = cost * it.qty
+                total_cost += lc
+                line["profit"] = f2(Decimal(str(it.line_total)) - lc)
+        out["cost_total"] = f2(total_cost) if known else None
+        out["profit"] = f2(Decimal(str(b.net_total)) - total_cost) if known else None
+    return out

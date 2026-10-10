@@ -832,3 +832,167 @@ def item_ledger_pdf(data: dict) -> bytes:
 
     doc.build(story, onFirstPage=_page_furniture, onLaterPages=_page_furniture)
     return buf.getvalue()
+
+
+# ==================================================== supplier ledger report
+def supplier_ledger_pdf(data: dict) -> bytes:
+    sup = data["supplier"]
+    s = data["summary"]
+    buf = io.BytesIO()
+    doc = new_doc(buf, f"Supplier Ledger — {sup['name']}")
+    story = [
+        header_band("Supplier Ledger", sup["name"], "Balance Owed to Supplier", money(s["outstanding"])),
+        Spacer(1, 4 * mm),
+        meta_block(
+            [
+                (
+                    "SUPPLIER",
+                    f"<b>{sup['name']}</b>"
+                    + (f"<br/>Phone: {sup['phone']}" if sup.get("phone") else "")
+                    + (f"<br/>{sup['address']}" if sup.get("address") else "")
+                    + (f"<br/>{sup['notes']}" if sup.get("notes") else ""),
+                ),
+                (
+                    "ACCOUNT",
+                    f"Supplier since: {fmt_day(sup.get('created_at'))}<br/>"
+                    f"First purchase: {fmt_day(s.get('first_purchase'))}<br/>"
+                    f"Last purchase: {fmt_day(s.get('last_purchase'))}<br/>"
+                    f"Purchases: {s['all_time_purchases']} "
+                    f"({s['open_purchases']} open · {s['closed_purchases']} settled)",
+                ),
+                (
+                    "REPORT FILTERS",
+                    filter_line(data.get("filters", {}))
+                    + f"<br/>Rows in this report: {len(data['entries'])}",
+                ),
+            ]
+        ),
+        Spacer(1, 4 * mm),
+        stat_tiles(
+            [
+                ("Opening balance", money(data["opening_balance"]), "#0C2049"),
+                ("Bought in period", money(s["period_bought"]), "#1D5BD8"),
+                ("Paid in period", money(s["period_paid"]), "#067647"),
+                ("Units bought", str(s["period_units"]), "#0C2049"),
+                (
+                    "Balance owed",
+                    money(s["outstanding"]),
+                    "#B45309" if Decimal(str(s["outstanding"])) > 0 else "#067647",
+                ),
+            ]
+        ),
+    ]
+
+    story += section(
+        "Running Account",
+        "Purchases are debits (what the shop owes), payments are credits. The Balance column is "
+        "the true amount owed to this supplier at that moment, across the whole history.",
+    )
+    entries = data["entries"]
+    if not entries:
+        story.append(empty_note("No activity with this supplier in this period."))
+    else:
+        rows = [
+            [
+                Paragraph("—", CELL),
+                Paragraph("<b>Opening balance</b>", CELL),
+                Paragraph("", CELL),
+                Paragraph("", CELL_R),
+                Paragraph("", CELL_R),
+                Paragraph("", CELL_R),
+                Paragraph(f"<b>{money(data['opening_balance'])}</b>", CELL_BR),
+            ]
+        ]
+        for e in entries:
+            is_p = e["kind"] == "purchase"
+            rows.append(
+                [
+                    fmt_day(e["date"]),
+                    Paragraph(("<b>PURCHASE</b> " if is_p else "<b>PAYMENT</b> ") + (e["particulars"] or ""), CELL),
+                    f"#{e['purchase_id']}",
+                    str(e["units"]) if e["units"] else "—",
+                    money(e["debit"]) if e["debit"] else "—",
+                    Paragraph(
+                        f'<font color="#067647">{money(e["credit"])}</font>' if e["credit"] else "—",
+                        CELL_R,
+                    ),
+                    Paragraph(f"<b>{money(e['balance'])}</b>", CELL_BR),
+                ]
+            )
+        story.append(
+            data_table(
+                ["Date", "Particulars", "Purchase", "Qty", "Debit (owed)", "Credit (paid)", "Balance"],
+                rows,
+                [28 * mm, 112 * mm, 20 * mm, 15 * mm, 32 * mm, 32 * mm, 34 * mm],
+                right={3, 4, 5, 6},
+                total_row=[
+                    "",
+                    "TOTAL FOR PERIOD",
+                    "",
+                    str(s["period_units"]),
+                    money(s["period_bought"]),
+                    money(s["period_paid"]),
+                    money(s["outstanding"]),
+                ],
+            )
+        )
+
+    purchases = data.get("purchases") or []
+    if purchases:
+        story += section("Purchase Detail — every lot bought from this supplier")
+        rows = []
+        for p in purchases:
+            rows.append(
+                [
+                    fmt_day(p["purchase_date"]),
+                    f"#{p['id']}",
+                    Paragraph(p["item_name"], CELL),
+                    p["stock_barcode"],
+                    str(p["qty"]),
+                    money(p["cost_price"]),
+                    money(p["total_cost"]),
+                    money(p["paid_amount"]),
+                    Paragraph(
+                        f'<font color="{"#B45309" if p["remaining_balance"] > 0 else "#067647"}">'
+                        f'{money(p["remaining_balance"])}</font>',
+                        CELL_R,
+                    ),
+                    p["status"].upper(),
+                    Paragraph(p["note"] or "—", CELL),
+                ]
+            )
+        story.append(
+            data_table(
+                ["Date", "No.", "Item", "Barcode", "Qty", "Cost / unit", "Total", "Paid", "Remaining", "Status", "Note"],
+                rows,
+                [26 * mm, 14 * mm, 52 * mm, 26 * mm, 12 * mm, 24 * mm, 26 * mm, 24 * mm, 26 * mm, 16 * mm, 27 * mm],
+                right={4, 5, 6, 7, 8},
+            )
+        )
+
+    top = data.get("top_items") or []
+    if top:
+        story += section("Items Bought — summary for this period")
+        rows = [
+            [Paragraph(t["item_name"], CELL), t["stock_barcode"], str(t["qty"]), str(t["lots"]), money(t["avg_cost"]), money(t["amount"])]
+            for t in top
+        ]
+        story.append(
+            data_table(
+                ["Item", "Barcode", "Total Qty", "Lots", "Avg cost / unit", "Amount"],
+                rows,
+                [85 * mm, 45 * mm, 28 * mm, 25 * mm, 40 * mm, 50 * mm],
+                right={2, 3, 4, 5},
+                total_row=[
+                    "TOTAL",
+                    "",
+                    str(sum(t["qty"] for t in top)),
+                    str(sum(t["lots"] for t in top)),
+                    "",
+                    money(sum(Decimal(str(t["amount"])) for t in top)),
+                ],
+            )
+        )
+
+    doc.build(story, onFirstPage=_page_furniture, onLaterPages=_page_furniture)
+    return buf.getvalue()
