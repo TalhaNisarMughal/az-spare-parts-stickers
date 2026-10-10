@@ -1,5 +1,5 @@
 -- ============================================================================
--- AZ Spare Parts and Stickers — Database Schema (PostgreSQL / Neon)
+-- Mughal Sticker — Database Schema (PostgreSQL / Neon)
 -- Idempotent: safe to run more than once.
 -- ============================================================================
 
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS stock (
 -- ------------------------------------------------------------------ bills
 -- One row per bill; line items live in bill_items, deposits in bill_payments.
 CREATE TABLE IF NOT EXISTS bills (
-    bill_id           VARCHAR(30)  PRIMARY KEY,                 -- e.g. AZ-00001
+    bill_id           VARCHAR(30)  PRIMARY KEY,                 -- e.g. MS-00001
     customer_code     VARCHAR(50)  NOT NULL REFERENCES customers(customer_code),
     salesman_name     VARCHAR(255) NOT NULL,
     payment_type      VARCHAR(20)  NOT NULL

@@ -26,7 +26,7 @@ def d2(x) -> Decimal:
 
 
 def next_bill_id(db: Session) -> str:
-    """Sequential bill numbers: AZ-00001, AZ-00002, …
+    """Sequential bill numbers: MS-00001, MS-00002, …
 
     Backed by a persistent counter so a number is never reused, even after a
     bill is deleted. Initialized from the current max if the counter is new.
@@ -44,7 +44,7 @@ def next_bill_id(db: Session) -> str:
         db.add(counter)
         db.flush()
     counter.value += 1
-    return f"AZ-{counter.value:05d}"
+    return f"MS-{counter.value:05d}"
 
 
 def _load_bill(db: Session, bill_id: str) -> Bill:

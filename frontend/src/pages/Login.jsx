@@ -31,8 +31,7 @@ export default function Login() {
     <div className="login-page">
       <div className="login-panel">
         <div className="login-brand">
-          <div className="brand-mark brand-mark--lg">AZ</div>
-          <h1>AZ Spare Parts and Stickers</h1>
+          <img className="login-logo" src="/logo.png" alt="Mughal Sticker" />
           <p>Customers · Store · Bills &amp; Ledger</p>
         </div>
 
@@ -48,7 +47,7 @@ export default function Login() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@azspareparts.com"
+              placeholder="you@mughalsticker.com"
               autoComplete="username"
               required
             />

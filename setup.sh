@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# AZ Spare Parts and Stickers — one-time setup (Linux / macOS)
+# Mughal Sticker — one-time setup (Linux / macOS)
 # Creates the Python venv, installs everything, and
 # initializes the Neon database with tables + login accounts.
 # ============================================================

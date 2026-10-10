@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================
-REM AZ Spare Parts and Stickers - start the app (Windows)
+REM Mughal Sticker - start the app (Windows)
 REM Opens the backend and frontend in two windows.
 REM ============================================================
 cd /d "%~dp0"
@@ -18,7 +18,7 @@ start "AZ Frontend" cmd /k "cd frontend && npm run dev"
 
 echo.
 echo ============================================================
-echo   AZ Spare Parts and Stickers is running
+echo   Mughal Sticker is running
 echo   App:      http://localhost:5173
 echo   API docs: http://localhost:8000/docs
 echo   Close both terminal windows to stop.

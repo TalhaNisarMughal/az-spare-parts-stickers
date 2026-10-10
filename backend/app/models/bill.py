@@ -18,7 +18,7 @@ from ..database import Base
 class Bill(Base):
     __tablename__ = "bills"
 
-    bill_id = Column(String(30), primary_key=True)  # e.g. AZ-00001
+    bill_id = Column(String(30), primary_key=True)  # e.g. MS-00001
     customer_code = Column(
         String(50), ForeignKey("customers.customer_code"), nullable=False, index=True
     )

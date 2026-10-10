@@ -15,11 +15,10 @@ export default function Layout() {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">AZ</div>
-          <div>
-            <div className="brand-name">AZ Spare Parts and Stickers</div>
-            <div className="brand-sub">Store &amp; Ledger System</div>
+          <div className="brand-logo">
+            <img src="/logo.png" alt="Mughal Sticker" />
           </div>
+          <div className="brand-sub">Store &amp; Ledger System</div>
         </div>
 
         <nav className="nav">

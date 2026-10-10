@@ -1,6 +1,6 @@
-# AZ Spare Parts and Stickers — Store & Ledger System
+# Mughal Sticker — Store & Ledger System
 
-A complete business management app for AZ Spare Parts and Stickers: customers, store inventory, bill generation with PDF slips, a running credit ledger with deposits over time, and an admin analytics dashboard.
+A complete business management app for Mughal Sticker: customers, store inventory, bill generation with PDF slips, a running credit ledger with deposits over time, and an admin analytics dashboard.
 
 **Stack:** React (Vite) · FastAPI (Python) · Neon PostgreSQL
 

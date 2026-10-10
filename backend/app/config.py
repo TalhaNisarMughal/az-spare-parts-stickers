@@ -12,11 +12,11 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 720
 
-    ADMIN_EMAIL: str = "admin@azspareparts.com"
+    ADMIN_EMAIL: str = "admin@mughalsticker.com"
     ADMIN_PASSWORD: str
     ADMIN_NAME: str = "Administrator"
 
-    USER_EMAIL: str = "user@azspareparts.com"
+    USER_EMAIL: str = "user@mughalsticker.com"
     USER_PASSWORD: str
     USER_NAME: str = "Staff User"
 

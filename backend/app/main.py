@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="AZ Spare Parts and Stickers API",
+    title="Mughal Sticker API",
     version="1.0.0",
     description="Customers, Store inventory, Bills & Ledger, and Dashboard analytics.",
     lifespan=lifespan,
@@ -72,4 +72,4 @@ app.include_router(dashboard.router)
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "app": "AZ Spare Parts and Stickers"}
+    return {"status": "ok", "app": "Mughal Sticker"}

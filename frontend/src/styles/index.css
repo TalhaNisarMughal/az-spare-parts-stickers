@@ -1,5 +1,5 @@
 /* ============================================================
-   AZ Spare Parts and Stickers — Design system
+   Mughal Sticker — Design system
    Off-white ledger paper, ink navy, working blue.
    Type: Archivo (headings) · Public Sans (body) · IBM Plex Mono (codes/amounts)
    ============================================================ */
@@ -100,46 +100,34 @@ select {
 
 .brand {
   display: flex;
-  gap: 11px;
+  flex-direction: column;
+  gap: 8px;
   align-items: center;
-  padding: 2px 6px 20px;
+  padding: 2px 4px 18px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.brand-mark {
-  width: 40px;
-  height: 40px;
+/* The logo artwork sits on white, so it gets its own paper tile inside the navy rail. */
+.brand-logo {
+  width: 100%;
+  background: #fff;
   border-radius: 9px;
-  background: var(--blue);
-  color: #fff;
-  font-family: var(--font-head);
-  font-weight: 800;
-  font-size: 17px;
-  display: grid;
-  place-items: center;
-  letter-spacing: 0.02em;
-  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.18);
+  padding: 10px 12px;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.12);
 }
 
-.brand-mark--lg {
-  width: 54px;
-  height: 54px;
-  font-size: 22px;
-  border-radius: 12px;
-}
-
-.brand-name {
-  font-family: var(--font-head);
-  font-weight: 700;
-  font-size: 15px;
-  color: #fff;
-  line-height: 1.2;
+.brand-logo img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .brand-sub {
-  font-size: 11.5px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: #9fb0d0;
-  margin-top: 2px;
 }
 
 .nav {
@@ -1188,9 +1176,10 @@ tbody tr:hover {
   gap: 10px;
 }
 
-.login-brand h1 {
-  font-size: 22px;
-  font-weight: 800;
+.login-logo {
+  width: 300px;
+  max-width: 100%;
+  height: auto;
 }
 
 .login-brand p {

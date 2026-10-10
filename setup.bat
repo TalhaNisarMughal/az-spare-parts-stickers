@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================
-REM AZ Spare Parts and Stickers - one-time setup (Windows)
+REM Mughal Sticker - one-time setup (Windows)
 REM ============================================================
 cd /d "%~dp0"
 

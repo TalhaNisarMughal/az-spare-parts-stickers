@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# AZ Spare Parts and Stickers — start the app (Linux / macOS)
+# Mughal Sticker — start the app (Linux / macOS)
 # Runs the FastAPI backend (port 8000) and the React
 # frontend (port 5173) together. Ctrl+C stops both.
 # ============================================================
@@ -18,7 +18,7 @@ fi
 
 cleanup() {
   echo ""
-  echo "Stopping AZ Spare Parts and Stickers…"
+  echo "Stopping Mughal Sticker…"
   kill "$BACKEND_PID" "$FRONTEND_PID" 2>/dev/null || true
   wait 2>/dev/null || true
 }
@@ -36,7 +36,7 @@ FRONTEND_PID=$!
 
 echo ""
 echo "============================================================"
-echo "  AZ Spare Parts and Stickers is running"
+echo "  Mughal Sticker is running"
 echo "  App:      http://localhost:5173"
 echo "  API docs: http://localhost:8000/docs"
 echo "  Press Ctrl+C to stop."

@@ -25,7 +25,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-from .pdf import AMBER, BLUE, GREEN, LINE, MUTED, NAVY, PAPER, money
+from .pdf import AMBER, BLUE, GREEN, LINE, MUTED, NAVY, PAPER, logo_image, money
 
 CONTENT_W = 273 * mm  # landscape A4 minus 12mm margins each side
 
@@ -79,7 +79,7 @@ def _page_furniture(canvas, doc):
     canvas.setFillColor(MUTED)
     w, _ = landscape(A4)
     canvas.drawString(
-        12 * mm, 8 * mm, f"AZ Spare Parts and Stickers — generated {datetime.now().strftime('%d %b %Y, %I:%M %p')}"
+        12 * mm, 8 * mm, f"Mughal Sticker — generated {datetime.now().strftime('%d %b %Y, %I:%M %p')}"
     )
     canvas.drawRightString(w - 12 * mm, 8 * mm, f"Page {canvas.getPageNumber()}")
     canvas.setStrokeColor(LINE)
@@ -101,11 +101,13 @@ def new_doc(buf, title: str) -> SimpleDocTemplate:
 
 
 def header_band(kind: str, name: str, right_label: str, right_value: str) -> Table:
+    logo_w = 36 * mm
     t = Table(
         [
             [
+                logo_image(28 * mm),
                 Paragraph(
-                    f'<font size="8" color="#B9C6E8">AZ SPARE PARTS AND STICKERS &nbsp;·&nbsp; {kind.upper()}</font><br/>'
+                    f'<font size="8" color="#B9C6E8">MUGHAL STICKER &nbsp;·&nbsp; {kind.upper()}</font><br/>'
                     f"<b>{name}</b>",
                     H1,
                 ),
@@ -116,15 +118,17 @@ def header_band(kind: str, name: str, right_label: str, right_value: str) -> Tab
                 ),
             ]
         ],
-        colWidths=[CONTENT_W * 0.62, CONTENT_W * 0.38],
+        colWidths=[logo_w, (CONTENT_W - logo_w) * 0.6, (CONTENT_W - logo_w) * 0.4],
     )
     t.setStyle(
         TableStyle(
             [
                 ("BACKGROUND", (0, 0), (-1, -1), NAVY),
+                ("BACKGROUND", (0, 0), (0, 0), colors.white),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("TOPPADDING", (0, 0), (-1, -1), 9),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+                ("ALIGN", (0, 0), (0, 0), "CENTER"),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
                 ("LEFTPADDING", (0, 0), (-1, -1), 10),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 10),
                 ("LINEBELOW", (0, 0), (-1, -1), 2.4, BLUE),
