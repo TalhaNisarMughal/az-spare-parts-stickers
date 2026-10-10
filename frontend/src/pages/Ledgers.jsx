@@ -1,4 +1,4 @@
-import { Package, Search, UserCog, Users } from 'lucide-react'
+import { Package, Search, Truck, UserCog, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import api, { apiError, fmtDay, fmtMoney } from '../api/client'
@@ -8,24 +8,31 @@ import ItemLedger from '../components/ledgers/ItemLedger'
 import LedgerFilters from '../components/ledgers/LedgerFilters'
 import LedgerPdfModal from '../components/ledgers/LedgerPdfModal'
 import SalesmanLedger from '../components/ledgers/SalesmanLedger'
+import SupplierLedger from '../components/ledgers/SupplierLedger'
+import ReceiptModal from '../components/ReceiptModal'
+import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 
-const TABS = [
+const ALL_TABS = [
   { key: 'customer', label: 'Customer Ledger', icon: Users },
   { key: 'salesman', label: 'Salesman Ledger', icon: UserCog },
   { key: 'item', label: 'Item Ledger', icon: Package },
+  { key: 'supplier', label: 'Supplier Ledger', icon: Truck, admin: true },
 ]
 
 const EMPTY_FILTERS = { q: '', dateFrom: '', dateTo: '', status: '', customerCode: '', salesman: '' }
 
 export default function Ledgers() {
   const toast = useToast()
+  const { user } = useAuth()
+  const TABS = ALL_TABS.filter((t) => !t.admin || user?.role === 'admin')
   const [params, setParams] = useSearchParams()
 
   const tab = TABS.some((t) => t.key === params.get('tab')) ? params.get('tab') : 'customer'
   const selected = params.get('id') || ''
 
-  const [directory, setDirectory] = useState({ customers: [], salesmen: [], items: [] })
+  const [directory, setDirectory] = useState({ customers: [], salesmen: [], items: [], suppliers: [] })
+  const [receipt, setReceipt] = useState(null)
   const [pickerQuery, setPickerQuery] = useState('')
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   // Held as { key, payload }: `tab` flips synchronously with the URL, so a
@@ -76,6 +83,7 @@ export default function Ledgers() {
       ...(tab === 'customer' ? { code: selected } : {}),
       ...(tab === 'salesman' ? { name: selected } : {}),
       ...(tab === 'item' ? { barcode: selected } : {}),
+      ...(tab === 'supplier' ? { id: selected } : {}),
     }),
     [tab, selected, filters]
   )
@@ -138,6 +146,18 @@ export default function Ledgers() {
           value: fmtMoney(s.total_billed),
         }))
 
+    if (tab === 'supplier')
+      return (directory.suppliers || [])
+        .filter((s) => match(s.name, s.phone))
+        .map((s) => ({
+          id: String(s.id),
+          title: s.name,
+          sub: s.phone || '—',
+          meta: `${s.purchases} purchase(s) · ${fmtDay(s.last_purchase)}`,
+          value: fmtMoney(s.outstanding),
+          danger: s.outstanding > 0,
+        }))
+
     return directory.items
       .filter((i) => match(i.stock_name, i.stock_barcode))
       .map((i) => ({
@@ -164,6 +184,11 @@ export default function Ledgers() {
       url: '/ledgers/item/pdf',
       title: `Item ledger — ${data?.item?.stock_name || ''}`,
       filename: `item-ledger-${selected}.pdf`,
+    },
+    supplier: {
+      url: '/ledgers/supplier/pdf',
+      title: `Supplier ledger — ${data?.supplier?.name || ''}`,
+      filename: `supplier-ledger-${selected}.pdf`,
     },
   }[tab]
 
@@ -223,7 +248,7 @@ export default function Ledgers() {
     </>
   )
 
-  const subjectNoun = { customer: 'customer', salesman: 'salesman', item: 'item' }[tab]
+  const subjectNoun = { customer: 'customer', salesman: 'salesman', item: 'item', supplier: 'supplier' }[tab]
 
   return (
     <div className="page">
@@ -297,6 +322,8 @@ export default function Ledgers() {
                   'What this salesman sold, to which customers, on what date, and the total sales generated.'}
                 {tab === 'item' &&
                   'Where this item went — which customers bought it, in what quantity, and what it earned.'}
+                {tab === 'supplier' &&
+                  'Everything you bought from this supplier, every payment you made, and what you still owe.'}
               </p>
             </div>
           ) : (
@@ -314,7 +341,9 @@ export default function Ledgers() {
                       ? 'Search items, barcode, bill ID or salesman…'
                       : tab === 'salesman'
                         ? 'Search customer, item, barcode or bill ID…'
-                        : 'Search customer, code, phone or salesman…'
+                        : tab === 'supplier'
+                          ? 'Search item, barcode or note…'
+                          : 'Search customer, code, phone or salesman…'
                   }
                 />
               </div>
@@ -356,6 +385,14 @@ export default function Ledgers() {
                       onOpenSalesman={openSalesman}
                     />
                   )}
+                  {tab === 'supplier' && (
+                    <SupplierLedger
+                      data={data}
+                      onPrint={() => setShowPdf(true)}
+                      onOpenItem={openItem}
+                      onOpenReceipt={(p) => setReceipt(p)}
+                    />
+                  )}
                 </div>
               )}
             </>
@@ -373,6 +410,17 @@ export default function Ledgers() {
         />
       )}
       {billPdf && <PdfModal billId={billPdf} onClose={() => setBillPdf(null)} />}
+      {receipt && (
+        <ReceiptModal
+          title={`Purchase receipt — ${receipt.item_name}`}
+          subtitle={`${fmtDay(receipt.purchase_date)} · ${fmtMoney(receipt.total_cost)}`}
+          receipt={{ id: receipt.receipt_id, filename: 'receipt', content_type: 'image/jpeg', size_bytes: 0, uploaded_at: null }}
+          endpoint={`/purchases/${receipt.id}/receipt`}
+          canEdit={false}
+          onChanged={() => {}}
+          onClose={() => setReceipt(null)}
+        />
+      )}
     </div>
   )
 }

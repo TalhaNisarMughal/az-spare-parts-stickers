@@ -1,7 +1,9 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import api, { apiError, fmtMoney } from '../../api/client'
+import api, { apiError, fmtMoney, toDayInput, todayISO, tzOffset, uploadFile } from '../../api/client'
 import { useToast } from '../../context/ToastContext'
+import DateField from '../DateField'
+import FilePicker from '../FilePicker'
 
 const PAYMENT_TYPES = ['Debit', 'Credit', 'Cash', 'Cheque']
 const emptyItem = () => ({ stock_barcode: '', description: '', unit_price: '', discounted_price: '', qty: '1' })
@@ -18,6 +20,8 @@ export default function BillForm({ bill, stock, customers, onSaved, onCancel }) 
   const [salesman, setSalesman] = useState(bill?.salesman_name || '')
   const [paymentType, setPaymentType] = useState(bill?.payment_type || 'Credit')
   const [deposited, setDeposited] = useState('0')
+  const [date, setDate] = useState(bill ? toDayInput(bill.purchase_date) : todayISO())
+  const [receiptFile, setReceiptFile] = useState(null)
   const [items, setItems] = useState(
     bill
       ? bill.items.map((it) => ({
@@ -155,12 +159,15 @@ export default function BillForm({ bill, stock, customers, onSaved, onCancel }) 
 
     try {
       if (editing) {
-        const { data } = await api.put(`/bills/${bill.bill_id}`, {
+        let { data } = await api.put(`/bills/${bill.bill_id}`, {
           customer_code: customerCode,
           salesman_name: salesman,
           payment_type: paymentType,
           items: itemsPayload,
+          purchase_date: date,
+          tz_offset: tzOffset(),
         })
+        if (receiptFile) ({ data } = await uploadFile(`/bills/${data.bill_id}/receipt`, receiptFile))
         toast.success(`Bill ${data.bill_id} updated.`)
         onSaved(data)
       } else {
@@ -179,9 +186,19 @@ export default function BillForm({ bill, stock, customers, onSaved, onCancel }) 
           payment_type: paymentType,
           items: itemsPayload,
           deposited_amount: Number(deposited) || 0,
+          purchase_date: date,
+          tz_offset: tzOffset(),
         })
+        let saved = data
+        if (receiptFile) {
+          try {
+            ;({ data: saved } = await uploadFile(`/bills/${data.bill_id}/receipt`, receiptFile))
+          } catch (err) {
+            toast.error(`Bill saved, but the receipt could not be attached: ${apiError(err)}`)
+          }
+        }
         toast.success(`Bill ${data.bill_id} generated.`)
-        onSaved(data)
+        onSaved(saved)
       }
     } catch (err) {
       setError(apiError(err))
@@ -314,6 +331,13 @@ export default function BillForm({ bill, stock, customers, onSaved, onCancel }) 
               ))}
             </select>
           </label>
+          <DateField label="Date of sale" value={date} onChange={setDate} note="Defaults to today — change it for sales made earlier." />
+          <FilePicker
+            file={receiptFile}
+            onChange={setReceiptFile}
+            label={bill?.receipt ? 'Replace sales receipt (optional)' : 'Sales receipt given to customer (optional)'}
+            hint="A photo or PDF of the receipt you handed over. The PDF bill slip is always generated anyway."
+          />
         </div>
       </section>
 

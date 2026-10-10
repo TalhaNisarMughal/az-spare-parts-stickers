@@ -3,6 +3,7 @@ import {
   BookOpen,
   CheckCircle2,
   Eye,
+  Paperclip,
   Pencil,
   Plus,
   RotateCcw,
@@ -12,16 +13,20 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import api, { apiError, fmtDate, fmtMoney } from '../api/client'
+import api, { apiError, fmtDate, fmtDay, fmtMoney } from '../api/client'
 import BillForm from '../components/bills/BillForm'
 import PaymentModal from '../components/bills/PaymentModal'
 import PdfModal from '../components/bills/PdfModal'
 import Modal from '../components/Modal'
+import ReceiptModal from '../components/ReceiptModal'
+import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 
 export default function Bills() {
   const toast = useToast()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const admin = user?.role === 'admin'
   const [bills, setBills] = useState([])
   const [stock, setStock] = useState([])
   const [customers, setCustomers] = useState([])
@@ -31,6 +36,7 @@ export default function Bills() {
   const [editBill, setEditBill] = useState(null)
   const [payBill, setPayBill] = useState(null)
   const [pdfBill, setPdfBill] = useState(null)
+  const [receiptBill, setReceiptBill] = useState(null)
 
   const [q, setQ] = useState('')
   const [dateFrom, setDateFrom] = useState('')
@@ -206,6 +212,7 @@ export default function Bills() {
                 <th className="th-num">Net Total</th>
                 <th className="th-num">Deposited</th>
                 <th className="th-num">Remaining</th>
+                {admin && <th className="th-num">Profit</th>}
                 <th>Payment</th>
                 <th>Status</th>
                 <th>Last Modified</th>
@@ -215,11 +222,11 @@ export default function Bills() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={12} className="empty-cell">Loading ledger…</td>
+                  <td colSpan={admin ? 13 : 12} className="empty-cell">Loading ledger…</td>
                 </tr>
               ) : bills.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="empty-cell">
+                  <td colSpan={admin ? 13 : 12} className="empty-cell">
                     {filtersActive
                       ? 'No bills match these filters.'
                       : 'No bills yet — generate the first one above.'}
@@ -229,7 +236,7 @@ export default function Bills() {
                 bills.map((b) => (
                   <tr key={b.bill_id} className={`ledger-row ledger-row--${b.status}`}>
                     <td className="mono td-strong">{b.bill_id}</td>
-                    <td className="td-muted">{fmtDate(b.purchase_date)}</td>
+                    <td className="td-muted">{fmtDay(b.purchase_date)}</td>
                     <td>
                       <button
                         className="link-btn td-strong"
@@ -270,6 +277,11 @@ export default function Bills() {
                     <td className={`td-num mono ${b.remaining_balance > 0 ? 'amount-due' : 'amount-clear'}`}>
                       {fmtMoney(b.remaining_balance)}
                     </td>
+                    {admin && (
+                      <td className={`td-num mono ${b.profit == null ? 'td-muted' : b.profit < 0 ? 'amount-due' : 'amount-clear'}`} title={b.profit == null ? 'Set a cost price on every item on this bill to see its profit' : `Cost of goods ${fmtMoney(b.cost_total)}`}>
+                        {b.profit == null ? '—' : fmtMoney(b.profit)}
+                      </td>
+                    )}
                     <td>{b.payment_type}</td>
                     <td>
                       <span className={`status-chip status-chip--${b.status}`}>
@@ -287,6 +299,13 @@ export default function Bills() {
                       </button>
                       <button className="icon-btn" title="Preview bill slip" onClick={() => setPdfBill(b.bill_id)}>
                         <Eye size={15} />
+                      </button>
+                      <button
+                        className={`icon-btn ${b.receipt ? 'icon-btn--has' : ''}`}
+                        title={b.receipt ? 'View the receipt given to the customer' : 'Attach the receipt given to the customer'}
+                        onClick={() => setReceiptBill(b)}
+                      >
+                        <Paperclip size={15} />
                       </button>
                       <button
                         className="icon-btn"
@@ -358,6 +377,20 @@ export default function Bills() {
       )}
 
       {pdfBill && <PdfModal billId={pdfBill} onClose={() => setPdfBill(null)} />}
+
+      {receiptBill && (
+        <ReceiptModal
+          title={`Sales receipt — ${receiptBill.bill_id}`}
+          subtitle={`${receiptBill.customer_name} · ${fmtDay(receiptBill.purchase_date)} · ${fmtMoney(receiptBill.net_total)}`}
+          receipt={receiptBill.receipt}
+          endpoint={`/bills/${receiptBill.bill_id}/receipt`}
+          onChanged={(updated) => {
+            setReceiptBill(updated)
+            setBills((rows) => rows.map((r) => (r.bill_id === updated.bill_id ? updated : r)))
+          }}
+          onClose={() => setReceiptBill(null)}
+        />
+      )}
     </div>
   )
 }

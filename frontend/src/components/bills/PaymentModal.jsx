@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import api, { apiError, fmtDate, fmtMoney } from '../../api/client'
+import api, { apiError, fmtDay, fmtMoney, todayISO, tzOffset } from '../../api/client'
 import { useToast } from '../../context/ToastContext'
+import DateField from '../DateField'
 import Modal from '../Modal'
 
 export default function PaymentModal({ bill, onClose, onSaved }) {
   const toast = useToast()
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
+  const [date, setDate] = useState(todayISO())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -24,6 +26,8 @@ export default function PaymentModal({ bill, onClose, onSaved }) {
       const { data } = await api.post(`/bills/${bill.bill_id}/payments`, {
         amount: val,
         note: note || null,
+        payment_date: date,
+        tz_offset: tzOffset(),
       })
       toast.success(
         data.status === 'closed'
@@ -76,7 +80,8 @@ export default function PaymentModal({ bill, onClose, onSaved }) {
               autoFocus
             />
           </label>
-          <label className="field">
+          <DateField label="Payment date" value={date} onChange={setDate} />
+          <label className="field span-2">
             <span>Note</span>
             <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional — e.g. cash received by Waqas" />
           </label>
@@ -97,7 +102,7 @@ export default function PaymentModal({ bill, onClose, onSaved }) {
           {bill.payments.map((p) => (
             <li key={p.id}>
               <span className="mono">{fmtMoney(p.amount)}</span>
-              <span className="td-muted">{fmtDate(p.payment_date)}</span>
+              <span className="td-muted">{fmtDay(p.payment_date)}</span>
               <span className="td-muted">{p.note || ''}</span>
             </li>
           ))}

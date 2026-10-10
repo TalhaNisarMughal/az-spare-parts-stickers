@@ -1,7 +1,8 @@
 import { BookOpen, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import api, { apiError, fmtDate } from '../api/client'
+import api, { apiError, fmtDay, toDayInput, todayISO, tzOffset } from '../api/client'
+import DateField from '../components/DateField'
 import Modal from '../components/Modal'
 import UploadWidget from '../components/UploadWidget'
 import { useToast } from '../context/ToastContext'
@@ -12,6 +13,7 @@ function CustomerForm({ initial, onSaved, onCancel }) {
   const toast = useToast()
   const editing = Boolean(initial)
   const [form, setForm] = useState(initial || EMPTY)
+  const [date, setDate] = useState(initial ? toDayInput(initial.created_at) : todayISO())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -28,6 +30,8 @@ function CustomerForm({ initial, onSaved, onCancel }) {
           phone_number: form.phone_number,
           shop_name: form.shop_name || null,
           address: form.address || null,
+          created_date: date,
+          tz_offset: tzOffset(),
         })
         toast.success('Customer updated.')
       } else {
@@ -35,6 +39,8 @@ function CustomerForm({ initial, onSaved, onCancel }) {
           ...form,
           shop_name: form.shop_name || null,
           address: form.address || null,
+          created_date: date,
+          tz_offset: tzOffset(),
         })
         toast.success('Customer saved.')
       }
@@ -73,10 +79,11 @@ function CustomerForm({ initial, onSaved, onCancel }) {
         <span>Shop Name</span>
         <input value={form.shop_name || ''} onChange={set('shop_name')} placeholder="Optional" />
       </label>
-      <label className="field span-2">
+      <label className="field">
         <span>Address</span>
         <input value={form.address || ''} onChange={set('address')} placeholder="Optional" />
       </label>
+      <DateField label="Customer since" value={date} onChange={setDate} />
       <div className="form-actions span-2">
         <button type="button" className="btn btn-ghost" onClick={onCancel}>
           Cancel
@@ -163,7 +170,7 @@ export default function Customers() {
                 <th>Phone Number</th>
                 <th>Shop Name</th>
                 <th>Address</th>
-                <th>Created</th>
+                <th>Customer Since</th>
                 <th className="th-actions">Actions</th>
               </tr>
             </thead>
@@ -186,7 +193,7 @@ export default function Customers() {
                     <td className="mono">{c.phone_number}</td>
                     <td>{c.shop_name || '—'}</td>
                     <td className="td-muted">{c.address || '—'}</td>
-                    <td className="td-muted">{fmtDate(c.created_at)}</td>
+                    <td className="td-muted">{fmtDay(c.created_at)}</td>
                     <td className="td-actions">
                       <button
                         className="icon-btn"
@@ -213,7 +220,7 @@ export default function Customers() {
       {modal && (
         <Modal
           title={modal === 'new' ? 'Add New Customer' : `Edit ${modal.customer_name}`}
-          subtitle={modal === 'new' ? 'The creation date is filled automatically.' : undefined}
+          subtitle={modal === 'new' ? 'The date defaults to today — change it for customers you added in the past.' : undefined}
           onClose={() => setModal(null)}
         >
           <CustomerForm

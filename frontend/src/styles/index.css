@@ -1775,3 +1775,275 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================
+   v2 — purchases, receipts, expenses, dashboard
+   ============================================================ */
+
+/* An icon button that has something behind it (a receipt is attached). */
+.icon-btn--has {
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+/* ---- file picker inside forms ---- */
+.file-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-height: 36px;
+}
+
+.file-picker-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--ink);
+  background: var(--blue-soft);
+  border: 1px solid #c9d9f6;
+  border-radius: 99px;
+  padding: 3px 4px 3px 11px;
+  max-width: 100%;
+}
+
+.file-picker-name .icon-btn {
+  width: 22px;
+  height: 22px;
+}
+
+/* ---- receipt modal ---- */
+.receipt-toolbar {
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.receipt-meta {
+  font-size: 12px;
+}
+
+.receipt-actions {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.receipt-image-wrap {
+  max-height: 70vh;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #f1f0ea;
+  display: flex;
+  justify-content: center;
+}
+
+.receipt-image {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* ---- toggle switch (e.g. "Record the purchase") ---- */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.switch input {
+  appearance: none;
+  width: 34px;
+  height: 20px;
+  border-radius: 99px;
+  background: #cfd4de;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin: 0;
+}
+
+.switch input::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s;
+}
+
+.switch input:checked {
+  background: var(--blue);
+}
+
+.switch input:checked::after {
+  transform: translateX(14px);
+}
+
+/* ---- expense category chip ---- */
+.cat-chip {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 99px;
+  background: var(--blue-soft);
+  color: var(--blue-deep);
+  border: 1px solid #c9d9f6;
+}
+
+/* ---- segmented tabs outside the chart card ---- */
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #fff;
+}
+
+/* ---- dashboard v2 ---- */
+.money--hidden {
+  filter: blur(7px);
+  user-select: none;
+  pointer-events: none;
+}
+
+.chart-hidden {
+  opacity: 0.6;
+}
+
+.period-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+}
+
+.period-segmented {
+  flex-wrap: wrap;
+}
+
+.period-custom {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.dash-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  margin: 4px 0 -8px;
+}
+
+.dash-section-title b {
+  color: var(--ink);
+}
+
+.page > div > .stat-grid,
+.page > div > .card,
+.page > div > .dash-grid,
+.page > div > .dash-section-title,
+.page > div > .dash-warning {
+  margin-bottom: 20px;
+}
+
+.page > div > .dash-section-title {
+  margin-bottom: 12px;
+}
+
+.stat-card--red {
+  border-left-color: var(--danger);
+}
+
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.delta--good {
+  color: var(--closed);
+}
+
+.delta--bad {
+  color: var(--danger);
+}
+
+.delta--none {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.dash-warning {
+  margin: -8px 0 0;
+  padding: 9px 13px;
+  background: var(--open-bg);
+  border: 1px solid var(--open-line);
+  border-radius: var(--radius-sm);
+  color: var(--open);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.cat-bars {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cat-bar-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  margin-bottom: 3px;
+}
+
+.cat-bar-track {
+  height: 6px;
+  background: #f1f0ea;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.cat-bar-fill {
+  height: 100%;
+  background: var(--open);
+  border-radius: 99px;
+}
+
+.rank-list--compact li {
+  padding: 7px 2px;
+}
+
+.rank-list--compact .rank-meta strong {
+  white-space: normal;
+}

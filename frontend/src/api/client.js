@@ -66,4 +66,26 @@ export const fmtDay = (iso) =>
       })
     : '—'
 
+// ---------------------------------------------------------------- manual dates
+// Every record date is typed by hand as a plain local day. The API takes the
+// YYYY-MM-DD plus the browser's timezone offset and stores it as UTC.
+export const tzOffset = () => new Date().getTimezoneOffset()
+
+export const isoDay = (d = new Date()) => {
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+export const todayISO = () => isoDay(new Date())
+
+/** ISO timestamp from the API -> YYYY-MM-DD in local time, for a date input. */
+export const toDayInput = (iso) => (iso ? isoDay(new Date(iso)) : todayISO())
+
+/** Upload a single file as multipart/form-data to `url` (POST). */
+export const uploadFile = (url, file) => {
+  const form = new FormData()
+  form.append('file', file)
+  return api.post(url, form)
+}
+
 export default api

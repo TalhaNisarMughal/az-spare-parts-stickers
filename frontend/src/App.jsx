@@ -5,6 +5,7 @@ import { ToastProvider } from './context/ToastContext'
 import Bills from './pages/Bills'
 import Customers from './pages/Customers'
 import Dashboard from './pages/Dashboard'
+import Expenses from './pages/Expenses'
 import Ledgers from './pages/Ledgers'
 import Login from './pages/Login'
 import Store from './pages/Store'
@@ -54,6 +55,14 @@ export default function App() {
               <Route path="/store" element={<Store />} />
               <Route path="/bills" element={<Bills />} />
               <Route path="/ledgers" element={<Ledgers />} />
+              <Route
+                path="/expenses"
+                element={
+                  <RequireAdmin>
+                    <Expenses />
+                  </RequireAdmin>
+                }
+              />
             </Route>
             <Route path="/" element={<Home />} />
             <Route path="*" element={<Home />} />

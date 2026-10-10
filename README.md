@@ -1,6 +1,6 @@
 # Mughal Sticker — Store & Ledger System
 
-A complete business management app for Mughal Sticker: customers, store inventory, bill generation with PDF slips, a running credit ledger with deposits over time, and an admin analytics dashboard.
+A complete business management app for Mughal Sticker: customers, store inventory with cost tracking, suppliers and purchases, bill generation with PDF slips, running ledgers (customer, salesman, item, supplier), daily expenses, and an admin profit dashboard.
 
 **Stack:** React (Vite) · FastAPI (Python) · Neon PostgreSQL
 
@@ -42,8 +42,8 @@ Then open **http://localhost:5173**.
 
 | Role | Email | Password | Sees |
 |---|---|---|---|
-| Admin | `ADMIN_EMAIL` | `ADMIN_PASSWORD` | Dashboard + everything |
-| User | `USER_EMAIL` | `USER_PASSWORD` | Everything **except** Dashboard |
+| Admin | `ADMIN_EMAIL` | `ADMIN_PASSWORD` | Everything, including the money-sensitive side: Dashboard, cost prices & profit, Purchases, Suppliers, Supplier ledger, Expenses |
+| User | `USER_EMAIL` | `USER_PASSWORD` | Customers, Store (qty & selling price only), Bills & Ledger, Customer/Salesman/Item ledgers |
 
 Both accounts are created automatically from the values you set in `backend/.env` — there are no built-in defaults, so the backend will refuse to start until you choose a `SECRET_KEY` and both passwords. To change a password later, edit `backend/.env` and re-run `python init_db.py` (or restart the backend).
 
@@ -51,31 +51,44 @@ Both accounts are created automatically from the values you set in `backend/.env
 
 ## 4. The modules
 
+> **Dates are entered by hand everywhere.** Every form (stock, purchases, bills, deposits, supplier payments, expenses, customers) has a date picker that defaults to today but can be set to any past date, so old records can be back-filled.
+
 ### Customers
-- Fields: Customer Code (unique ID), Customer Name, Phone Number, Shop Name (optional), Address (optional), creation date (automatic).
+- Fields: Customer Code (unique ID), Customer Name, Phone Number, Shop Name (optional), Address (optional), "customer since" date (manual, defaults to today).
 - Add customers one at a time, or bulk import with **Upload CSV / Excel**. Download the **CSV/Excel template** buttons to get the exact format.
 - Invalid rows are skipped and listed with the row number and the reason; valid rows still import.
 - Everything is editable later except the Customer Code.
 
 ### Store
-- Fields: Stock Barcode (unique ID), Stock Name, Qty, Unit Price, creation date (automatic).
-- Same one-by-one or bulk-upload flow, with the same templates and per-row error reporting.
+Three tabs for the admin (staff only see Inventory):
+
+**Inventory** — Stock Barcode (unique ID), Stock Name, Qty, Selling Price, Cost Price (admin), Margin (admin), date added.
+- **Add Stock** (admin) records the item *and where it was bought*: pick an existing supplier or add a new one, cost price per unit, what was paid now, and an optional photo/PDF of the supplier's bill. Total cost and remaining balance are calculated live.
+- **Restock** (📦+ icon) adds a new purchase lot to an existing item.
+- The cost price is the **weighted average** of every purchase lot (recalculated on each restock); it can also be typed by hand for items with no purchases.
+- Bulk upload accepts an optional `cost_price` column.
 - Low-stock items (≤ 5 units) and out-of-stock items are highlighted.
+
+**Purchases** — every lot bought: date, supplier, item, qty, cost/unit, total, paid, remaining, receipt. Pay the supplier over time (💵 icon), attach/replace the receipt (📎), edit or delete (stock is adjusted). Filters by supplier, date range and paid/owed status.
+
+**Suppliers** — everyone you buy from, with total bought, paid and what you still owe. Click a name for the supplier ledger.
 
 ### Bills & Ledger
 - **Generate New Bill** — choose an **Existing Customer** (searchable) or add a **New Customer** on the spot (they're saved to the Customers module too).
 - Add one or more items: pick from the store, the barcode and price fill automatically, the price stays editable, and an optional **Discount / Unit** shows the discount %.
 - Quantity is checked live against the store — if you ask for more than is available you'll see *"Quantity is not available in the inventory."*
 - Payment type: Debit / Credit / Cash / Cheque. The **Deposited Amount** can be 0 (credit sales are the default here) and the **Remaining Balance** is calculated automatically.
+- The **date of sale** is picked manually (defaults to today). A photo/PDF of the receipt handed to the customer can be attached at creation or later (📎 icon) and viewed any time.
 - After generation a **PDF bill slip** is saved to `backend/generated_bills/` and can be previewed any time with the **eye** button.
-- **Deposits over time:** the banknote button records new deposits; deposited/remaining update everywhere and the full payment history is kept.
+- The admin sees a **Profit** column per bill: each line snapshots the item's cost price at the moment of sale, so a bill's profit never changes when later purchases change the cost.
+- **Deposits over time:** the banknote button records new deposits (with a manual date); deposited/remaining update everywhere and the full payment history is kept.
 - Bills **auto-close** when the balance reaches 0, and can also be manually toggled open/closed.
 - Rows are colour-coded: **yellow line = open** (balance remaining), **green line = closed** (fully cleared).
 - Edit or delete any bill — stock quantities are adjusted or returned to the store automatically, and the PDF slip is regenerated.
 - Search (case-insensitive) by customer name, item name, barcode, salesman or Bill ID, plus date-range and open/closed filters.
 
 ### Ledgers
-Three complete track records, each filterable and printable. Reachable from the **Ledgers** tab, and by clicking any customer, salesman or item name in Bills & Ledger, Customers or Store.
+Four complete track records, each filterable and printable. Reachable from the **Ledgers** tab, and by clicking any customer, salesman or item name in Bills & Ledger, Customers or Store.
 
 **Customer ledger** — a true running account. Bills are debits, payments are credits, merged into one chronological timeline so every row shows the balance *at that moment*. Includes an opening balance for the period, every item on every bill (qty, price, discount, line total), a summary of what the customer buys, and totals for the period.
 
@@ -85,16 +98,29 @@ Three complete track records, each filterable and printable. Reachable from the 
 
 **Item ledger** — where one item went. Which customers bought it (name, code, phone, shop, qty, dates, amounts, balances), which salesmen sold it, a month-by-month breakdown, and every individual sale. Shows what the item earned and what is still owed on it.
 
-**Filters (all three):** free-text search, quick ranges (this/last month, last 7/30 days, this/last year), a month picker, explicit From/To dates, and open/closed status. The salesman ledger adds a customer filter; the item ledger adds both customer and salesman filters.
+**Supplier ledger** (admin) — the customer ledger turned around: purchases are debits (what you owe), payments are credits, with a true running balance, every lot bought, and a summary of what you buy from them.
+
+**Filters (all ledgers):** free-text search, quick ranges (this/last month, last 7/30 days, this/last year), a month picker, explicit From/To dates, and open/closed status. The salesman ledger adds a customer filter; the item ledger adds both customer and salesman filters.
 
 **PDF:** every ledger has a **Preview / Print PDF** button — a landscape report built live from whatever filters are active, previewed in the app with Print and Download.
 
 > **On per-item money:** payments are recorded against a *bill*, not against individual lines. So the paid/outstanding figures on an item or salesman line are that line's proportional share of its bill, labelled "(share)" wherever they appear. Bill-level and customer-level figures are exact.
 
+### Expenses (admin only)
+- Log day-to-day business spending: date, category (preset list + your own), amount, paid to, note, optional receipt.
+- Filter by category and date range; totals and a per-category breakdown for the chosen period.
+
 ### Dashboard (admin only)
-- Totals: customers, items, units in stock, units sold, revenue and collections (this month + all time), outstanding balance, open/closed ledgers.
-- Revenue chart (billed vs collected) switchable between daily / weekly / monthly / yearly.
-- Most sold items, most recurring customers, most paying customers, and a low-stock watch list.
+- **Money is hidden by default** (blurred) — the *Show finances* button reveals it for the current visit.
+- **Period filter**: Today, Yesterday, This week, This month, Last month, This year, Last year, All time, or a custom range. Every figure and list below follows it.
+- Period cards: Sales, Gross profit (sales − cost of goods, with margin %), Expenses, Net profit (gross − expenses), Cash collected, Cash out, Stock bought — each with the % change versus the previous equal-length period.
+- All-time position: what customers owe you, what you owe suppliers, stock value at cost, customers/items/suppliers.
+- **Is the business growing?** — Sales, gross profit, net profit and expenses over time (daily / weekly / monthly / yearly).
+- What sold, where the money went (expenses by category), bills, top customers and a low-stock watch list, all for the chosen period.
+- Profit is counted on the **sale date** (when billed), not when the customer pays. Bills sold before a cost price was set fall back to the item's current cost; the dashboard warns when a period contains lines with no cost at all.
+
+### Receipts
+Uploaded receipts (purchases, bills, expenses) are stored **in the database**, not on disk, so they survive Render redeploys. Photos are downscaled to 1600px JPEG on upload; PDFs are kept as-is. Max 8 MB per file.
 
 ---
 
