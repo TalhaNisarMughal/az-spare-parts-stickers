@@ -11,6 +11,9 @@ Profit definitions (counted on the *sale date*, not when the customer pays):
     gross profit  = sales - cost of goods
     expenses      = everything logged on the Expenses page
     net profit    = gross profit - expenses
+
+Cash (what is physically left in hand, counted when money moves):
+    cash in hand  = collected from customers - paid to suppliers - expenses
 """
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -264,6 +267,18 @@ def summary(
         "closed_bills": db.query(func.count(Bill.bill_id)).filter(Bill.status == "closed").scalar() or 0,
         "open_purchases": db.query(func.count(Purchase.id)).filter(Purchase.status == "open").scalar() or 0,
     }
+    # Lifetime money position: what has actually come in and gone out since day one.
+    lifetime = period if not start and not end else _period_metrics(db, None, None, costs)
+    all_time.update(
+        {
+            "sales": lifetime["sales"],
+            "net_profit": lifetime["net_profit"],
+            "collected": lifetime["collected"],
+            "paid_to_suppliers": lifetime["paid_to_suppliers"],
+            "expenses": lifetime["expenses"],
+            "cash_in_hand": lifetime["cash_net"],
+        }
+    )
 
     low_stock = db.query(Stock).filter(Stock.qty <= 5).order_by(Stock.qty.asc()).limit(6).all()
 

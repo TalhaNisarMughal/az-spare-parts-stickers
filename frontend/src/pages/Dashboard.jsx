@@ -30,6 +30,9 @@ const GRANULARITIES = [
   { key: 'year', label: 'Yearly' },
 ]
 
+/** YYYY-MM-DD -> "16 Oct 2026", read as a local calendar day (not UTC midnight). */
+const fmtLocalDay = (day) => fmtDay(`${day}T00:00:00`)
+
 const startOfWeek = (d) => {
   const s = new Date(d)
   s.setDate(d.getDate() - ((d.getDay() + 6) % 7)) // Monday
@@ -119,8 +122,14 @@ export default function Dashboard() {
 
   const periodLabel =
     period === 'custom'
-      ? `${dateFrom ? fmtDay(dateFrom) : 'start'} → ${dateTo ? fmtDay(dateTo) : 'today'}`
+      ? `${dateFrom ? fmtLocalDay(dateFrom) : 'start'} → ${dateTo ? fmtLocalDay(dateTo) : 'today'}`
       : PERIODS.find((p) => p.key === period).label.toLowerCase()
+  // The exact calendar days the figures cover, so it is obvious the filter applied.
+  const rangeLabel = !dateFrom && !dateTo
+    ? 'every record since the first bill'
+    : dateFrom === dateTo
+      ? fmtLocalDay(dateFrom)
+      : `${dateFrom ? fmtLocalDay(dateFrom) : 'start'} → ${dateTo ? fmtLocalDay(dateTo) : 'today'}`
 
   const p = summary?.period
   const a = summary?.all_time
@@ -165,7 +174,7 @@ export default function Dashboard() {
       ) : (
         <div className={loading ? 'is-refreshing' : ''}>
           {/* ---------------- headline figures for the period ---------------- */}
-          <h2 className="dash-section-title">Showing <b>{periodLabel}</b></h2>
+          <h2 className="dash-section-title">Showing <b>{periodLabel}</b> <span className="dash-range">· {rangeLabel}</span></h2>
           <div className="stat-grid">
             <StatCard label="Sales" value={p.sales} hidden={hidden} accent="blue" delta={summary.change.sales} sub={`${p.bills} bill(s) · ${p.units_sold} unit(s) sold`} />
             <StatCard label="Gross profit" value={p.gross_profit} hidden={hidden} accent="green" delta={summary.change.gross_profit}
@@ -175,6 +184,7 @@ export default function Dashboard() {
               sub={p.net_profit >= 0 ? 'gross profit − expenses · a profitable period' : 'gross profit − expenses · a loss this period'} />
             <StatCard label="Cash collected" value={p.collected} hidden={hidden} delta={summary.change.collected} sub="deposits received from customers" />
             <StatCard label="Cash out" value={p.cash_out} hidden={hidden} sub={`${money(p.paid_to_suppliers)} to suppliers + ${money(p.expenses)} expenses`} />
+            <StatCard label="Cash in hand" value={p.cash_net} hidden={hidden} accent={p.cash_net >= 0 ? 'green' : 'red'} sub="collected − paid to suppliers − expenses" />
             <StatCard label="Stock bought" value={p.purchases_cost} hidden={hidden} sub={`${p.purchases} purchase(s) from suppliers`} />
           </div>
           {p.unknown_cost_lines > 0 && (
@@ -183,9 +193,46 @@ export default function Dashboard() {
             </p>
           )}
 
+          {/* ---------------- what is left ---------------- */}
+          <div className="card">
+            <div className="card-title-row">
+              <div>
+                <h2>What is left in your hand ({periodLabel})</h2>
+                <p className="page-sub">Profit is what you earned on the sales; cash is the money that actually came in and went out.</p>
+              </div>
+            </div>
+            <div className="flow-grid">
+              <table className="flow-table">
+                <thead><tr><th>Profit on sales</th><th className="th-num">Rs</th></tr></thead>
+                <tbody>
+                  <tr><td>Sales</td><td className="td-num mono"><Money v={p.sales} hidden={hidden} /></td></tr>
+                  <tr><td>− Cost of goods sold</td><td className="td-num mono"><Money v={p.cost_of_goods} hidden={hidden} /></td></tr>
+                  <tr className="flow-sub"><td>= Gross profit</td><td className="td-num mono"><Money v={p.gross_profit} hidden={hidden} /></td></tr>
+                  <tr><td>− Expenses</td><td className="td-num mono"><Money v={p.expenses} hidden={hidden} /></td></tr>
+                  <tr className={`flow-total ${p.net_profit < 0 ? 'flow-total--bad' : ''}`}><td>= Net profit</td><td className="td-num mono"><Money v={p.net_profit} hidden={hidden} /></td></tr>
+                </tbody>
+              </table>
+              <table className="flow-table">
+                <thead><tr><th>Cash movement</th><th className="th-num">Rs</th></tr></thead>
+                <tbody>
+                  <tr><td>Collected from customers</td><td className="td-num mono"><Money v={p.collected} hidden={hidden} /></td></tr>
+                  <tr><td>− Paid to suppliers</td><td className="td-num mono"><Money v={p.paid_to_suppliers} hidden={hidden} /></td></tr>
+                  <tr><td>− Expenses</td><td className="td-num mono"><Money v={p.expenses} hidden={hidden} /></td></tr>
+                  <tr className={`flow-total ${p.cash_net < 0 ? 'flow-total--bad' : ''}`}><td>= Cash in hand</td><td className="td-num mono"><Money v={p.cash_net} hidden={hidden} /></td></tr>
+                </tbody>
+              </table>
+            </div>
+            {p.bills === 0 && p.expenses === 0 && p.collected === 0 && p.paid_to_suppliers === 0 && (
+              <p className="empty-note">Nothing was recorded on {rangeLabel}. Pick another period above.</p>
+            )}
+          </div>
+
           {/* ---------------- all-time position ---------------- */}
           <h2 className="dash-section-title">Where you stand <span className="td-muted">(all time)</span></h2>
           <div className="stat-grid">
+            <StatCard label="Cash in hand" value={a.cash_in_hand} hidden={hidden} accent={a.cash_in_hand >= 0 ? 'green' : 'red'}
+              sub={`${money(a.collected)} collected − ${money(a.paid_to_suppliers)} to suppliers − ${money(a.expenses)} expenses`} />
+            <StatCard label="Net profit" value={a.net_profit} hidden={hidden} accent={a.net_profit >= 0 ? 'green' : 'red'} sub={`on ${money(a.sales)} of sales since the start`} />
             <StatCard label="Customers owe you" value={a.receivable} hidden={hidden} accent="amber" sub={`${a.open_bills} open · ${a.closed_bills} closed ledgers`} />
             <StatCard label="You owe suppliers" value={a.payable} hidden={hidden} accent="amber" sub={`${a.open_purchases} unpaid purchase(s)`} />
             <StatCard label="Stock value (at cost)" value={a.stock_value_cost} hidden={hidden}
