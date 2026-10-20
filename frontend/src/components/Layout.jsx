@@ -1,6 +1,7 @@
 import {
   BookOpen,
   ChevronDown,
+  HandCoins,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -78,6 +79,9 @@ export default function Layout() {
           </NavLink>
           <NavLink to="/ledgers" className="nav-link">
             <BookOpen size={19} /> Ledgers
+          </NavLink>
+          <NavLink to="/receivables" className="nav-link">
+            <HandCoins size={19} /> Receivables
           </NavLink>
           {admin && (
             <NavLink to="/expenses" className="nav-link">

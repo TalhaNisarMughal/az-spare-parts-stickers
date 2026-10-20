@@ -2407,3 +2407,81 @@ table .role-user {
 .flow-total--bad td {
   color: var(--danger);
 }
+
+/* ============================================================
+   v3 — receivables (per-customer account + receive on account)
+   ============================================================ */
+
+.recv-totals {
+  margin-bottom: 16px;
+}
+
+.recv-picker-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.recv-picker-tools select {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12.5px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+.check-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.check-inline input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--blue);
+  margin: 0;
+}
+
+.recv-head-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.recv-alloc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.field-note .link-btn {
+  font-size: inherit;
+}
+
+@media (max-width: 640px) {
+  .recv-head-actions {
+    width: 100%;
+  }
+
+  .recv-head-actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
+
+.recv-history td:nth-child(-n + 3),
+.recv-history .entry-tag {
+  white-space: nowrap;
+}

@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard'
 import Expenses from './pages/Expenses'
 import Ledgers from './pages/Ledgers'
 import Login from './pages/Login'
+import Receivables from './pages/Receivables'
 import SettingsPage from './pages/Settings'
 import Store from './pages/Store'
 
@@ -56,6 +57,7 @@ export default function App() {
               <Route path="/store" element={<Store />} />
               <Route path="/bills" element={<Bills />} />
               <Route path="/ledgers" element={<Ledgers />} />
+              <Route path="/receivables" element={<Receivables />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route
                 path="/expenses"

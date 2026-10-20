@@ -84,3 +84,11 @@ class BillPayment(Base):
     amount = Column(Numeric(14, 2), nullable=False)
     payment_date = Column(DateTime, default=datetime.utcnow, nullable=False)
     note = Column(Text, nullable=True)
+    # Set when this slice came from an account-level receiving (see
+    # Settlement); NULL for deposits recorded directly on the bill.
+    settlement_id = Column(
+        Integer,
+        ForeignKey("customer_settlements.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )

@@ -89,6 +89,28 @@ CREATE TABLE IF NOT EXISTS bill_payments (
 
 CREATE INDEX IF NOT EXISTS idx_bill_payments_bill ON bill_payments(bill_id);
 
+-- --------------------------------------------------- customer_settlements
+-- One amount received from a customer against their account as a whole.
+-- It is split across that customer's unpaid bills oldest-first; each slice
+-- is a bill_payments row pointing back here via settlement_id.
+CREATE TABLE IF NOT EXISTS customer_settlements (
+    id            SERIAL PRIMARY KEY,
+    customer_code VARCHAR(50) NOT NULL REFERENCES customers(customer_code),
+    amount        NUMERIC(14,2) NOT NULL CHECK (amount > 0),
+    payment_date  TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
+    note          TEXT,
+    created_by    VARCHAR(255),
+    created_at    TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc')
+);
+
+CREATE INDEX IF NOT EXISTS idx_customer_settlements_customer
+    ON customer_settlements(customer_code);
+
+ALTER TABLE bill_payments
+    ADD COLUMN IF NOT EXISTS settlement_id INTEGER
+    REFERENCES customer_settlements(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_bill_payments_settlement ON bill_payments(settlement_id);
+
 -- --------------------------------------------------------------- counters
 -- Monotonic counters (bill numbering). Bill numbers are never reused.
 CREATE TABLE IF NOT EXISTS counters (

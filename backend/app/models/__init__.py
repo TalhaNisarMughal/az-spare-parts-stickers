@@ -7,6 +7,7 @@ from .receipt import Receipt
 from .supplier import Supplier
 from .purchase import Purchase, PurchasePayment
 from .expense import Expense
+from .settlement import Settlement
 
 __all__ = [
     "User",
@@ -21,4 +22,5 @@ __all__ = [
     "Purchase",
     "PurchasePayment",
     "Expense",
+    "Settlement",
 ]

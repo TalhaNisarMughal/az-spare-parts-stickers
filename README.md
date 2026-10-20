@@ -43,7 +43,7 @@ Then open **http://localhost:5173**.
 | Role | Email | Password | Sees |
 |---|---|---|---|
 | Admin | `ADMIN_EMAIL` | `ADMIN_PASSWORD` | Everything, including the money-sensitive side: Dashboard, cost prices & profit, Purchases, Suppliers, Supplier ledger, Expenses |
-| User | `USER_EMAIL` | `USER_PASSWORD` | Customers, Store (qty & selling price only), Bills & Ledger, Customer/Salesman/Item ledgers |
+| User | `USER_EMAIL` | `USER_PASSWORD` | Customers, Store (qty & selling price only), Bills & Ledger, Customer/Salesman/Item ledgers, Receivables (record receivings; undo is admin-only) |
 
 These two accounts are created from `backend/.env` **the first time the app starts on an empty database**. After that, accounts are managed in the app (**Settings**): names, emails, roles, passwords and profile pictures — the `.env` values are never re-applied, so changing them later has no effect on existing accounts.
 
@@ -107,6 +107,13 @@ Four complete track records, each filterable and printable. Reachable from the *
 **PDF:** every ledger has a **Preview / Print PDF** button — a landscape report built live from whatever filters are active, previewed in the app with Print and Download.
 
 > **On per-item money:** payments are recorded against a *bill*, not against individual lines. So the paid/outstanding figures on an item or salesman line are that line's proportional share of its bill, labelled "(share)" wherever they appear. Bill-level and customer-level figures are exact.
+
+### Receivables
+One screen for *who owes what*. Every customer is listed with their **total sale**, **total received** and **total remaining** (sorted by highest remaining, with a "with dues only" switch), and the page header totals the whole book.
+
+Open a customer and press **Receive payment** to record an amount against the account as a whole instead of opening bills one by one. The amount is applied to that customer's unpaid bills **oldest first**; the modal previews exactly which bills it will clear before you save. Every bill whose balance reaches zero is **closed automatically**, and the per-bill slices appear as normal deposits on the bill slip and in the Customer ledger. The **Money received** table shows every receiving (and every deposit recorded directly on a bill) with the bills it was applied to; the admin can **undo** a receiving, which reopens the bills it had closed.
+
+> A receiving can only be dated on or after the bills it settles, and never for more than the customer owes.
 
 ### Expenses (admin only)
 - Log day-to-day business spending: date, category (preset list + your own), amount, paid to, note, optional receipt.
