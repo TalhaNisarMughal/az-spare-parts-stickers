@@ -17,6 +17,7 @@ COLUMNS: list[tuple[str, str, str]] = [
     ("users", "avatar_type", "VARCHAR(50)"),
     ("users", "avatar_updated_at", "TIMESTAMP"),
     ("bill_payments", "settlement_id", "INTEGER REFERENCES customer_settlements(id) ON DELETE SET NULL"),
+    ("purchase_payments", "settlement_id", "INTEGER REFERENCES supplier_settlements(id) ON DELETE SET NULL"),
 ]
 
 

@@ -1,4 +1,5 @@
 import {
+  Banknote,
   BookOpen,
   ChevronDown,
   HandCoins,
@@ -83,6 +84,11 @@ export default function Layout() {
           <NavLink to="/receivables" className="nav-link">
             <HandCoins size={19} /> Receivables
           </NavLink>
+          {admin && (
+            <NavLink to="/payables" className="nav-link">
+              <Banknote size={19} /> Payables
+            </NavLink>
+          )}
           {admin && (
             <NavLink to="/expenses" className="nav-link">
               <Wallet size={19} /> Expenses

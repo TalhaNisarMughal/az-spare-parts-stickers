@@ -42,7 +42,7 @@ Then open **http://localhost:5173**.
 
 | Role | Email | Password | Sees |
 |---|---|---|---|
-| Admin | `ADMIN_EMAIL` | `ADMIN_PASSWORD` | Everything, including the money-sensitive side: Dashboard, cost prices & profit, Purchases, Suppliers, Supplier ledger, Expenses |
+| Admin | `ADMIN_EMAIL` | `ADMIN_PASSWORD` | Everything, including the money-sensitive side: Dashboard, cost prices & profit, Purchases, Suppliers, Supplier ledger, Payables, Expenses |
 | User | `USER_EMAIL` | `USER_PASSWORD` | Customers, Store (qty & selling price only), Bills & Ledger, Customer/Salesman/Item ledgers, Receivables (record receivings; undo is admin-only) |
 
 These two accounts are created from `backend/.env` **the first time the app starts on an empty database**. After that, accounts are managed in the app (**Settings**): names, emails, roles, passwords and profile pictures — the `.env` values are never re-applied, so changing them later has no effect on existing accounts.
@@ -114,6 +114,13 @@ One screen for *who owes what*. Every customer is listed with their **total sale
 Open a customer and press **Receive payment** to record an amount against the account as a whole instead of opening bills one by one. The amount is applied to that customer's unpaid bills **oldest first**; the modal previews exactly which bills it will clear before you save. Every bill whose balance reaches zero is **closed automatically**, and the per-bill slices appear as normal deposits on the bill slip and in the Customer ledger. The **Money received** table shows every receiving (and every deposit recorded directly on a bill) with the bills it was applied to; the admin can **undo** a receiving, which reopens the bills it had closed.
 
 > A receiving can only be dated on or after the bills it settles, and never for more than the customer owes.
+
+### Payables (admin only)
+The same screen from the other side of the counter: *who you owe*. Every supplier is listed with the **total purchased** from them, **total paid** and **total remaining**, and the page header totals the whole book.
+
+Open a supplier and press **Pay supplier** to record an amount against the account as a whole instead of paying purchases one by one. The amount is applied to that supplier's unpaid purchases **oldest first**; the modal previews exactly which purchases it will clear before you save. Every purchase whose balance reaches zero is **marked paid automatically**, and the per-purchase slices appear as normal payments in the Supplier ledger and on the Purchases tab. The **Money paid** table shows every payment (and every payment recorded directly on a purchase) with the purchases it was applied to; a payment made on account can be **undone**, which reopens the purchases it had closed.
+
+> A payment can only be dated on or after the purchases it settles, and never for more than you owe the supplier.
 
 ### Expenses (admin only)
 - Log day-to-day business spending: date, category (preset list + your own), amount, paid to, note, optional receipt.

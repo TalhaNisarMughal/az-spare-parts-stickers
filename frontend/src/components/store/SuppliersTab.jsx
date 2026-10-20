@@ -1,4 +1,4 @@
-import { BookOpen, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { Banknote, BookOpen, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api, { apiError, fmtDay, fmtMoney } from '../../api/client'
@@ -133,6 +133,7 @@ export default function SuppliersTab({ suppliers, onChanged }) {
                   <td className="td-muted">{fmtDay(s.last_purchase)}</td>
                   <td className="td-actions">
                     <button className="icon-btn" title="Open supplier ledger" onClick={() => navigate(`/ledgers?tab=supplier&id=${s.id}`)}><BookOpen size={15} /></button>
+                    <button className="icon-btn" title="Pay on account (Payables)" onClick={() => navigate(`/payables?id=${s.id}`)} disabled={s.outstanding <= 0}><Banknote size={15} /></button>
                     <button className="icon-btn" title="Edit" onClick={() => setModal(s)}><Pencil size={15} /></button>
                     <button className="icon-btn icon-btn--danger" title="Delete" onClick={() => remove(s)}><Trash2 size={15} /></button>
                   </td>

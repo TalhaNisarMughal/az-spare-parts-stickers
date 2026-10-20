@@ -182,6 +182,28 @@ CREATE TABLE IF NOT EXISTS purchase_payments (
 
 CREATE INDEX IF NOT EXISTS idx_purchase_payments_purchase ON purchase_payments(purchase_id);
 
+-- --------------------------------------------------- supplier_settlements
+-- One amount paid to a supplier against their account as a whole. It is
+-- split across that supplier's unpaid purchases oldest-first; each slice is
+-- a purchase_payments row pointing back here via settlement_id.
+CREATE TABLE IF NOT EXISTS supplier_settlements (
+    id            SERIAL PRIMARY KEY,
+    supplier_id   INTEGER NOT NULL REFERENCES suppliers(id),
+    amount        NUMERIC(14,2) NOT NULL CHECK (amount > 0),
+    payment_date  TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc'),
+    note          TEXT,
+    created_by    VARCHAR(255),
+    created_at    TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc')
+);
+
+CREATE INDEX IF NOT EXISTS idx_supplier_settlements_supplier
+    ON supplier_settlements(supplier_id);
+
+ALTER TABLE purchase_payments
+    ADD COLUMN IF NOT EXISTS settlement_id INTEGER
+    REFERENCES supplier_settlements(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_purchase_payments_settlement ON purchase_payments(settlement_id);
+
 -- ---------------------------------------------------------------- expenses
 CREATE TABLE IF NOT EXISTS expenses (
     id           SERIAL PRIMARY KEY,

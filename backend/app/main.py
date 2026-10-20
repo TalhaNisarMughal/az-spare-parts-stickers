@@ -15,6 +15,7 @@ from .routers import (
     dashboard,
     expenses,
     ledgers,
+    payables,
     purchases,
     receipts,
     receivables,
@@ -91,6 +92,7 @@ app.include_router(purchases.router)
 app.include_router(expenses.router)
 app.include_router(receipts.router)
 app.include_router(receivables.router)
+app.include_router(payables.router)
 app.include_router(ledgers.router)
 app.include_router(dashboard.router)
 

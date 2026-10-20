@@ -72,3 +72,11 @@ class PurchasePayment(Base):
     amount = Column(Numeric(14, 2), nullable=False)
     payment_date = Column(DateTime, default=datetime.utcnow, nullable=False)
     note = Column(Text, nullable=True)
+    # Set when this slice came from an account-level payment to the supplier
+    # (see SupplierSettlement); NULL for payments recorded on the purchase.
+    settlement_id = Column(
+        Integer,
+        ForeignKey("supplier_settlements.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
